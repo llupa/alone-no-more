@@ -46,36 +46,111 @@ final class LeadTheWayTest extends TestCase
         $answer = $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
             'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]])->leadTheWay('Deputy Willem');
 
-        self::assertSame('playerbots exec Menelan !nc -follow', $sent[0] ?? null);
-        self::assertSame('playerbots exec Menelan !go travel Deputy Willem', $sent[1] ?? null);
+        // The walk is handed to the bot's own StayStrategy, anchored at the destination,
+        // because one-shot orders lose to a strategy that runs every tick. `follow` resets
+        // both engines and both recorded positions, `nc -follow` stops the following that
+        // reset just turned on, the anchor moves to the target, and only then is `stay`
+        // switched on — anchor before strategy, or it holds the spot it is standing on.
+        self::assertSame('playerbots exec Menelan !follow', $sent[0] ?? null);
+        self::assertSame('playerbots exec Menelan !nc -follow', $sent[1] ?? null);
+        // 95 yards away, so the whole walk fits in one leg and the anchor is the destination.
+        self::assertSame('playerbots exec Menelan !position stay 95,0,50', $sent[2] ?? null);
+        self::assertSame('playerbots exec Menelan !nc +stay', $sent[3] ?? null);
         self::assertStringContainsString('Deputy Willem', $answer);
     }
 
     /**
-     * The travel system only knows places its destination lists contain. Anywhere else still
-     * has to work, and stopping a few paces short matters there: walking onto an NPC leaves the
-     * companion inside them and can block the player clicking the person they asked for.
+     * A journey is hot memory that has to be let go when something else owns the feet.
+     *
+     * Without this the container outlived what it described: "follow me" during a walk gave a
+     * companion that followed for one second, then re-anchored itself on the next leg because
+     * the journey was still open. The walk has to end when it is superseded.
      */
-    public function testAPlaceTheTravelSystemDoesNotKnowFallsBackToCoordinates(): void
+    public function testAnOrderThatTakesTheFeetEndsTheWalk(): void
     {
         $sent = [];
         $world = $this->createMock(WorldGatewayInterface::class);
         $world->method('execute')->willReturnCallback(static function (string $c) use (&$sent): string {
             $sent[] = $c;
 
-            // The travel form is refused; the coordinate form is not.
-            if (str_contains($c, 'go travel')) {
-                throw new \App\World\Exception\WorldGatewayException('no such destination');
-            }
+            return 'ok';
+        });
+
+        $journeys = new Journeys($world, new PlayerbotCommandRunner($world));
+        $tools = $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
+            'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]], $journeys);
+
+        $tools->leadTheWay('Deputy Willem');
+        self::assertContains('playerbots exec Menelan !nc +stay', $sent, 'the walk should have started');
+
+        $tools->doThis('follow');
+        $afterTheOrder = \count($sent);
+
+        // Nothing left walking, so nothing re-anchors on the next pass.
+        self::assertSame([], $journeys->tick());
+        self::assertCount($afterTheOrder, $sent);
+    }
+
+    /**
+     * The leash, and why the feature refuses rather than pretends.
+     *
+     * `Playerbots.ReactDistance` — 150 yards as shipped — is a hard limit on every "go there"
+     * mechanism the mod has: a stay anchor beyond it is discarded by
+     * `ReturnToStayPositionAction::isPossible()`, and `GoAction`'s coordinate form refuses with
+     * "It is too far away". Six rewrites tried to get past it and the traces were unambiguous:
+     * inside the leash a companion arrives every time, outside it the distance never changes by
+     * a yard. Announcing a walk and then standing still is worse than saying no.
+     */
+    public function testSomewhereTooFarIsRefusedRatherThanPromised(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->expects(self::never())->method('execute');
+
+        $answer = $this->tools($world, [['name' => 'Marshal Dughan', 'level_min' => 5, 'level_max' => 5,
+            'spawns' => 1, 'map' => 0, 'x' => 400.0, 'y' => 0.0]])->leadTheWay('Marshal Dughan');
+
+        self::assertStringContainsString('too far', $answer);
+        self::assertStringNotContainsString('You are walking', $answer);
+    }
+
+    /**
+     * Inside the leash it still walks, which is most of what players ask for.
+     */
+    public function testSomewhereNearbyIsStillWalkedTo(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->method('execute')->willReturn('ok');
+
+        $answer = $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
+            'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]])->leadTheWay('Deputy Willem');
+
+        self::assertStringContainsString('You are walking', $answer);
+    }
+
+    /**
+     * `go travel <name>` is deliberately not used any more, and this pins that.
+     *
+     * It whispers "Clearing travel target" and returns *success* whenever the travel system
+     * does not recognise the name (`GoAction.cpp`), which it does not for most NPCs. Nothing
+     * threw, so the coordinate fallback never ran and the companion simply stood still while
+     * reporting that it was on its way.
+     */
+    public function testItDoesNotRelyOnTheModsTravelSystem(): void
+    {
+        $sent = [];
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->method('execute')->willReturnCallback(static function (string $c) use (&$sent): string {
+            $sent[] = $c;
 
             return 'ok';
         });
 
-        // Bot at the origin, target 100 yards due north.
         $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
             'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]])->leadTheWay('Deputy Willem');
 
-        self::assertMatchesRegularExpression('/!go 95\.00;0\.00;/', end($sent) ?: '');
+        foreach ($sent as $command) {
+            self::assertStringNotContainsString('go travel', $command);
+        }
     }
 
     public function testSomebodyUnknownIsNotWalkedTo(): void
@@ -105,9 +180,39 @@ final class LeadTheWayTest extends TestCase
     }
 
     /**
+     * The sequence that failed in play, and the reason the fix spans two classes.
+     *
+     * A companion that had arrived somewhere was told to `stay`, and `stay` is a movement
+     * strategy that returns the bot to its anchor every tick. Leading anywhere afterwards then
+     * did nothing at all — four times over in one session — because setting off only removed
+     * `follow`. Nothing in a single journey shows this; it only appears on the second one.
+     */
+    public function testASecondJourneyAfterArrivingStillSetsOff(): void
+    {
+        $sent = [];
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->method('execute')->willReturnCallback(static function (string $c) use (&$sent): string {
+            $sent[] = $c;
+
+            return 'ok';
+        });
+
+        $tools = $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
+            'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]]);
+
+        $tools->leadTheWay('Deputy Willem');
+        $secondJourney = \count($sent);
+
+        $tools->leadTheWay('Deputy Willem');
+
+        self::assertSame('playerbots exec Menelan !follow', $sent[$secondJourney] ?? null);
+        self::assertSame('playerbots exec Menelan !nc -follow', $sent[$secondJourney + 1] ?? null);
+    }
+
+    /**
      * @param array<int, array<string, mixed>> $creatures
      */
-    private function tools(WorldGatewayInterface $world, array $creatures): CompanionTools
+    private function tools(WorldGatewayInterface $world, array $creatures, ?Journeys $journeys = null): CompanionTools
     {
         $knowledge = $this->createStub(GameKnowledgeInterface::class);
         $knowledge->method('findCreatures')->willReturn($creatures);
@@ -128,7 +233,7 @@ final class LeadTheWayTest extends TestCase
             $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
-            new Journeys($world, new PlayerbotCommandRunner($world)),
+            $journeys ?? new Journeys($world, new PlayerbotCommandRunner($world)),
         );
     }
 }

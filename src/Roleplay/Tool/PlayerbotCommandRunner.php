@@ -85,6 +85,33 @@ final readonly class PlayerbotCommandRunner
     }
 
     /**
+     * Move a bot's "stay" anchor to a point, so that it walks there and then holds.
+     *
+     * This is the mechanism that defeated four attempts at leading the way, turned around.
+     * `StayStrategy` registers "return to stay position", whose trigger is simply
+     * `distance > FollowDistance` with no upper bound, re-checked every tick — so a bot with a
+     * stay anchor walks to it persistently and waits on arrival. That is exactly what leading
+     * the way needs, and nothing issued from outside the engine can compete with it.
+     *
+     * The anchor must be moved with `position stay x,y,z` rather than the `stay` chat command,
+     * which overwrites it with wherever the bot is currently standing.
+     *
+     * Own method for the same reason as {@see goTo()}: {@see COMMAND} has no business allowing
+     * raw coordinate punctuation from a model, so the string is built here from floats. The
+     * mod parses these with `atoi`, so they are whole yards — well inside `FollowDistance`.
+     *
+     * @throws WorldGatewayException when the name is malformed or the server refuses
+     */
+    public function anchorAt(string $botName, float $x, float $y, float $z): string
+    {
+        if (1 !== preg_match(self::NAME, $botName)) {
+            throw new WorldGatewayException(\sprintf('"%s" is not a character name.', $botName));
+        }
+
+        return $this->send($botName, \sprintf('position stay %d,%d,%d', (int) $x, (int) $y, (int) $z));
+    }
+
+    /**
      * Send a bot travelling to a named place, using the mod's own travel system.
      *
      * `go <x>;<y>;<z>` issues one movement order, and a strategy beats an order: a companion

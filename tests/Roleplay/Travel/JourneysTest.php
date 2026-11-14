@@ -17,7 +17,9 @@ use PHPUnit\Framework\TestCase;
  * Walking somewhere and staying there.
  *
  * `go` is one movement order. A companion that is also following its master drifts back the
- * moment the walk ends, so arriving has to be noticed and answered with `stay`.
+ * The walking is the bot's own: a `stay` anchor at the destination carries it there. What
+ * is left for this class is noticing the arrival, settling the companion exactly where it
+ * stands, and giving up on a walk that never finishes.
  */
 #[CoversClass(Journeys::class)]
 #[CoversClass(Journey::class)]
@@ -43,7 +45,7 @@ final class JourneysTest extends TestCase
         $world = $this->worldWithBotAt(new Position(100.0, 0.0, 50.0, 0));
         $world->expects(self::once())
             ->method('execute')
-            ->with('playerbots exec Menelan !stay')
+            ->with('playerbots exec Menelan !position stay 100,0,50')
             ->willReturn('ok');
 
         $journeys = $this->journeys($world);
@@ -54,10 +56,77 @@ final class JourneysTest extends TestCase
         self::assertStringContainsString('reached Deputy Willem', $news[self::BOT] ?? '');
     }
 
-    public function testStillWalkingIsLeftAlone(): void
+    /**
+     * A fresh journey anchors its first leg immediately.
+     */
+    public function testTheFirstLegIsAnchored(): void
+    {
+        $world = $this->worldWithBotAt(new Position(120.0, 0.0, 50.0, 0));
+        $world->expects(self::once())
+            ->method('execute')
+            ->with('playerbots exec Menelan !position stay 240,0,50')
+            ->willReturn('ok');
+
+        $journeys = $this->journeys($world);
+        $journeys->start(new Journey(self::BOT, new Position(400.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true)));
+
+        self::assertSame([], $journeys->tick());
+    }
+
+    /**
+     * A companion that has stopped moving has almost certainly had its anchor taken away:
+     * `PlayerbotAI::ChangeEngineOnNonCombat()` resets the stay position every time a bot leaves
+     * combat, so one wandering boar stranded a walk for good. Standing still is the only
+     * outward sign, so it is what re-anchoring keys on.
+     */
+    public function testAStalledCompanionIsAnchoredAgain(): void
     {
         $world = $this->worldWithBotAt(new Position(0.0, 0.0, 50.0, 0));
+        $world->expects(self::once())
+            ->method('execute')
+            ->with('playerbots exec Menelan !position stay 120,0,50')
+            ->willReturn('ok');
+
+        $journeys = $this->journeys($world);
+
+        $journey = new Journey(self::BOT, new Position(400.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true));
+        // Anchored a long time ago, and the bot has not moved an inch since.
+        $journey->anchor = new Position(120.0, 0.0, 50.0, 0);
+        $journey->wasAt = new Position(0.0, 0.0, 50.0, 0);
+        $journey->anchoredAt = microtime(true) - 30.0;
+        $journeys->start($journey);
+
+        self::assertSame([], $journeys->tick());
+    }
+
+    /**
+     * Walking normally must not re-anchor: every `position stay` is a whisper at the player,
+     * and once a second turned a stuck companion into a chatty one.
+     */
+    public function testACompanionMakingProgressIsLeftAlone(): void
+    {
+        $world = $this->worldWithBotAt(new Position(40.0, 0.0, 50.0, 0));
         $world->expects(self::never())->method('execute');
+
+        $journeys = $this->journeys($world);
+
+        $journey = new Journey(self::BOT, new Position(400.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true));
+        $journey->anchor = new Position(120.0, 0.0, 50.0, 0);
+        $journey->wasAt = new Position(20.0, 0.0, 50.0, 0);
+        $journey->anchoredAt = microtime(true);
+        $journeys->start($journey);
+
+        self::assertSame([], $journeys->tick());
+    }
+
+    /**
+     * Still walking is not news. The anchor is re-sent, but nothing is reported to the player
+     * until the companion arrives or the walk is abandoned.
+     */
+    public function testStillWalkingIsNotReported(): void
+    {
+        $world = $this->worldWithBotAt(new Position(0.0, 0.0, 50.0, 0));
+        $world->method('execute')->willReturn('ok');
 
         $journeys = $this->journeys($world);
         $journeys->start(new Journey(self::BOT, new Position(500.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true)));

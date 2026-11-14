@@ -9,7 +9,6 @@ use App\World\Exception\WorldGatewayException;
 use App\World\WorldGatewayInterface;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * Watches companions who are walking somewhere, and tells them to wait when they arrive.
@@ -25,9 +24,6 @@ final class Journeys
     public function __construct(
         private readonly WorldGatewayInterface $world,
         private readonly PlayerbotCommandRunner $runner,
-        /** How often to re-send the destination while a companion is still on its way. */
-        #[Autowire(env: 'int:ANM_JOURNEY_NUDGE_SECONDS')]
-        private readonly int $nudgeSeconds = 5,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -82,10 +78,16 @@ final class Journeys
                 unset($this->walking[$guid]);
                 $news[$guid] = \sprintf('%s reached %s and is waiting there', $bot->name, $journey->towards);
 
-                // Hold position. Following is already off — it was switched off to let them
-                // walk — so this is belt and braces, and it is what the player asked for: wait
-                // here. `follow` puts them right again whenever they say so.
-                $this->tell($bot->name, 'stay');
+                // Already holding position: the walk was driven by `stay` anchored at the
+                // destination, so the companion stops there of its own accord. Re-anchoring on
+                // the spot it actually reached settles it exactly where it stands, instead of
+                // leaving it shuffling against a target z we guessed from its own height at
+                // the other end of the walk.
+                try {
+                    $this->runner->anchorAt($bot->name, $bot->position->x, $bot->position->y, $bot->position->z);
+                } catch (WorldGatewayException $e) {
+                    $this->logger->warning('{bot} would not settle: {why}', ['bot' => $bot->name, 'why' => $e->getMessage()]);
+                }
 
                 continue;
             }
@@ -101,10 +103,19 @@ final class Journeys
                 continue;
             }
 
-            // Still walking. Record the gap every pass, whether or not we nudge: two fixes for
-            // this have now failed in play on the strength of "it didn't move", which is not
-            // enough to tell a bot that never set off from one that set off and was dragged
-            // back. A trace distinguishes them.
+            // Still walking. The anchor does the moving; this drags it along the route, a leg
+            // at a time, and re-sends it every pass.
+            //
+            // Both halves are load-bearing. Anything beyond `Playerbots.ReactDistance` is
+            // discarded by the mod and replaced with wherever the bot is standing, so the leg
+            // has to stay short. And the anchor is destroyed behind our back —
+            // `PlayerbotAI::ChangeEngineOnNonCombat()` resets the stay position whenever a bot
+            // leaves combat — so re-sending only on arrival deadlocked the moment anything
+            // attacked: the companion could not reach a leg whose anchor no longer existed.
+            // Re-sending cannot be unconditional either: each one makes the companion whisper
+            // "Position stay is set" at the player. So it goes out when a leg is walked, or
+            // when nothing has moved for a while — the only outward sign that the anchor was
+            // taken away.
             $togo = hypot(
                 $bot->position->x - $journey->destination->x,
                 $bot->position->y - $journey->destination->y,
@@ -117,19 +128,21 @@ final class Journeys
                 'elapsed' => (int) round($now - $journey->startedAt),
             ]);
 
-            if ($journey->needsNudge($now, (float) $this->nudgeSeconds)) {
-                $journey->lastNudgeAt = $now;
+            if (!$journey->needsAnchor($bot->position, $now)) {
+                $journey->wasAt = $bot->position;
 
-                try {
-                    $this->runner->goTo(
-                        $bot->name,
-                        $journey->destination->x,
-                        $journey->destination->y,
-                        $bot->position->z,
-                    );
-                } catch (WorldGatewayException $e) {
-                    $this->logger->warning('Could not nudge {bot} onward: {why}', ['bot' => $bot->name, 'why' => $e->getMessage()]);
-                }
+                continue;
+            }
+
+            $leg = $journey->nextLeg($bot->position);
+
+            try {
+                $this->runner->anchorAt($bot->name, $leg->x, $leg->y, $leg->z);
+                $journey->anchor = $leg;
+                $journey->anchoredAt = $now;
+                $journey->wasAt = $bot->position;
+            } catch (WorldGatewayException $e) {
+                $this->logger->warning('Could not set {bot} on the next leg: {why}', ['bot' => $bot->name, 'why' => $e->getMessage()]);
             }
         }
 
