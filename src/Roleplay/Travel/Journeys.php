@@ -101,8 +101,22 @@ final class Journeys
                 continue;
             }
 
-            // Still walking: point them at it again. One `go` is not enough, because the follow
-            // strategy keeps pulling them back toward the player.
+            // Still walking. Record the gap every pass, whether or not we nudge: two fixes for
+            // this have now failed in play on the strength of "it didn't move", which is not
+            // enough to tell a bot that never set off from one that set off and was dragged
+            // back. A trace distinguishes them.
+            $togo = hypot(
+                $bot->position->x - $journey->destination->x,
+                $bot->position->y - $journey->destination->y,
+            );
+
+            $this->logger->info('{bot} is {togo} yards from {towards} ({elapsed}s in)', [
+                'bot' => $bot->name,
+                'togo' => (int) round($togo),
+                'towards' => $journey->towards,
+                'elapsed' => (int) round($now - $journey->startedAt),
+            ]);
+
             if ($journey->needsNudge($now, (float) $this->nudgeSeconds)) {
                 $journey->lastNudgeAt = $now;
 

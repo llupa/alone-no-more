@@ -85,6 +85,32 @@ final readonly class PlayerbotCommandRunner
     }
 
     /**
+     * Send a bot travelling to a named place, using the mod's own travel system.
+     *
+     * `go <x>;<y>;<z>` issues one movement order, and a strategy beats an order: a companion
+     * told to lead walked a few paces and came back, twice over, under two different fixes.
+     * `go travel <name>` is different in kind — it sets a *forced* travel target that the bot
+     * pursues across ticks, which is how the mod sends its own bots across a continent.
+     *
+     * Matched on a title substring against quest, zone, NPC and creature destinations, so it
+     * only works for places the travel system knows. The caller falls back to coordinates.
+     *
+     * @throws WorldGatewayException when the name is malformed or the server refuses
+     */
+    public function travelTo(string $botName, string $destination): string
+    {
+        if (1 !== preg_match(self::NAME, $botName)) {
+            throw new WorldGatewayException(\sprintf('"%s" is not a character name.', $botName));
+        }
+
+        if (1 !== preg_match('/^[A-Za-z0-9 \'-]{2,40}$/', $destination)) {
+            throw new WorldGatewayException(\sprintf('"%s" is not a place name.', $destination));
+        }
+
+        return $this->send($botName, 'go travel '.$destination);
+    }
+
+    /**
      * @return string the server's acknowledgement, e.g. `Nytalleath: 'follow' sent`
      *
      * @throws WorldGatewayException when the name or command is malformed, the bot is offline,

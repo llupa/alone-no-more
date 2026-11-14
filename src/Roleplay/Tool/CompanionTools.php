@@ -222,16 +222,24 @@ final readonly class CompanionTools
         [$x, $y] = self::shortOf($bot->position->x, $bot->position->y, (float) $target['x'], (float) $target['y']);
 
         try {
-            // Drop the follow strategy first, or it wins. `go` issues one movement order while
-            // FollowMasterStrategy runs every tick, so a companion told to lead walked about
-            // fifteen paces and came straight back. Removing it rather than using `stay`:
-            // the movement strategies are siblings, so `stay` would not free the bot, it would
-            // anchor it somewhere new and fight the walk from there instead.
+            // Drop the follow strategy first, or it wins: `go` issues one movement order while
+            // FollowMasterStrategy runs every tick. Removing it rather than using `stay`,
+            // because the movement strategies are siblings — `stay` would not free the bot, it
+            // would anchor it somewhere new and fight the walk from there instead.
             $this->runner->run($bot->name, 'nc -follow');
 
-            // Z is left as the bot's own: the server pathfinds, and guessing a height from a
-            // spawn average is how you send someone into the ground.
-            $this->runner->goTo($bot->name, $x, $y, $bot->position->z);
+            // The mod's own travel system first. A forced travel target is pursued across
+            // ticks, which is the only mechanism here that is the same *kind* of thing as a
+            // strategy; two attempts at out-issuing one have now failed in play. It only knows
+            // places its destination lists contain, so coordinates remain the fallback.
+            //
+            // Z is the bot's own either way: the server pathfinds, and guessing a height from
+            // an averaged spawn is how you send someone into the ground.
+            try {
+                $this->runner->travelTo($bot->name, $target['name']);
+            } catch (WorldGatewayException) {
+                $this->runner->goTo($bot->name, $x, $y, $bot->position->z);
+            }
         } catch (WorldGatewayException $e) {
             return 'You could not set off: '.$e->getMessage();
         }

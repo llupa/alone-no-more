@@ -28,26 +28,53 @@ use PHPUnit\Framework\TestCase;
 final class LeadTheWayTest extends TestCase
 {
     /**
-     * Stop a few paces short. Walking onto an NPC leaves the companion standing inside them,
-     * which looks wrong and can block the player clicking the very person they asked for.
+     * Following comes off first, then the mod's own travel system is asked for the place by
+     * name. A forced travel target survives across ticks; a one-shot move order does not,
+     * which is why two earlier attempts failed in play.
      */
-    public function testItStopsShortOfTheTarget(): void
+    public function testItStopsFollowingAndTravelsToTheNamedPlace(): void
     {
-        $sent = null;
+        $sent = [];
         $world = $this->createMock(WorldGatewayInterface::class);
         $world->method('execute')->willReturnCallback(static function (string $c) use (&$sent): string {
-            $sent = $c;
+            $sent[] = $c;
+
+            return 'ok';
+        });
+
+        $answer = $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
+            'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]])->leadTheWay('Deputy Willem');
+
+        self::assertSame('playerbots exec Menelan !nc -follow', $sent[0] ?? null);
+        self::assertSame('playerbots exec Menelan !go travel Deputy Willem', $sent[1] ?? null);
+        self::assertStringContainsString('Deputy Willem', $answer);
+    }
+
+    /**
+     * The travel system only knows places its destination lists contain. Anywhere else still
+     * has to work, and stopping a few paces short matters there: walking onto an NPC leaves the
+     * companion inside them and can block the player clicking the person they asked for.
+     */
+    public function testAPlaceTheTravelSystemDoesNotKnowFallsBackToCoordinates(): void
+    {
+        $sent = [];
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->method('execute')->willReturnCallback(static function (string $c) use (&$sent): string {
+            $sent[] = $c;
+
+            // The travel form is refused; the coordinate form is not.
+            if (str_contains($c, 'go travel')) {
+                throw new \App\World\Exception\WorldGatewayException('no such destination');
+            }
 
             return 'ok';
         });
 
         // Bot at the origin, target 100 yards due north.
-        $answer = $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
+        $this->tools($world, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
             'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0]])->leadTheWay('Deputy Willem');
 
-        self::assertNotNull($sent);
-        self::assertMatchesRegularExpression('/^playerbots exec Menelan !go 95\.00;0\.00;/', $sent);
-        self::assertStringContainsString('Deputy Willem', $answer);
+        self::assertMatchesRegularExpression('/!go 95\.00;0\.00;/', end($sent) ?: '');
     }
 
     public function testSomebodyUnknownIsNotWalkedTo(): void
