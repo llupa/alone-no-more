@@ -27,6 +27,9 @@ final class PlayerbotVocabularyTest extends TestCase
         self::assertTrue(PlayerbotVocabulary::isCommand($message), "\"$message\" is an order");
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function orders(): iterable
     {
         yield 'bare command' => ['!follow'];
@@ -44,6 +47,9 @@ final class PlayerbotVocabularyTest extends TestCase
         self::assertFalse(PlayerbotVocabulary::isCommand($message), "\"$message\" is conversation");
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function conversation(): iterable
     {
         yield 'a question beginning with a command word' => ["Who is Anub'arak?"];

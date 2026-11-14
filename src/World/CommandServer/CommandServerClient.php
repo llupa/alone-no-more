@@ -43,7 +43,7 @@ final class CommandServerClient
     {
         $raw = $this->send('position', $botGuid);
 
-        if (null === $raw || self::isError($raw)) {
+        if (self::isError($raw)) {
             return null;
         }
 
@@ -79,9 +79,9 @@ final class CommandServerClient
     }
 
     /**
-     * @return string|null the server's reply, or null when it reports an error for this bot
+     * @return string the server's reply, or null when it reports an error for this bot
      */
-    public function send(string $command, int $botGuid): ?string
+    public function send(string $command, int $botGuid): string
     {
         $socket = $this->socket();
 

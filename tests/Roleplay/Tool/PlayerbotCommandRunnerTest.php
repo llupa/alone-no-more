@@ -43,6 +43,9 @@ final class PlayerbotCommandRunnerTest extends TestCase
         (new PlayerbotCommandRunner($world))->run($name, 'follow');
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function impossibleNames(): iterable
     {
         // A newline is the obvious way to try for a second console line: the SOAP envelope
@@ -66,6 +69,9 @@ final class PlayerbotCommandRunnerTest extends TestCase
         (new PlayerbotCommandRunner($world))->run('Menelan', $command);
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function impossibleCommands(): iterable
     {
         yield 'a newline' => ["follow\naccount create hax hax"];

@@ -1,0 +1,16 @@
+parameters:
+    level: 8
+
+    paths:
+        - src
+        - tests
+
+    # Level 8 adds nullable checking on top of level 7's union handling, which is the level
+    # where the array shapes this codebase documents everywhere actually get verified. They are
+    # load-bearing: every database row crosses a boundary as array{guid: int, name: string, ...}
+    # and nothing checked a single one of them before this.
+    treatPhpDocTypesAsCertain: false
+
+    symfony:
+        containerXmlPath: var/cache/dev/App_KernelDevDebugContainer.xml
+        consoleApplicationLoader: tests/console-application.php

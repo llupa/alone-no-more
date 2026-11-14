@@ -141,7 +141,10 @@ final class Settings
     /**
      * Everything currently in force, defaults included, for showing someone where they stand.
      *
-     * @return array<string, int|bool|string[]>
+     * A shape rather than a map of unions: callers format these for a person, and `int|bool|
+     * string[]` means every one of them has to narrow a value it already knows the type of.
+     *
+     * @return array{crowd_size: int, level_tolerance: int, reply_cooldown_seconds: int, herding: bool, followed: string[]}
      */
     public function all(): array
     {

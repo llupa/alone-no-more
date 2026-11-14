@@ -18,6 +18,10 @@ use PHPUnit\Framework\TestCase;
  */
 final class PartyBotSelectorTest extends TestCase
 {
+    /**
+     * @param int[]           $partyGuids
+     * @param array<int, int> $secondsSinceReply
+     */
     private function selector(
         array $partyGuids,
         array $secondsSinceReply = [],
@@ -66,6 +70,9 @@ final class PartyBotSelectorTest extends TestCase
         self::assertNotNull($chosen, $channel->name.' should be answered');
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function partyChannels(): iterable
     {
         yield 'party' => [ChatChannel::Party];
@@ -86,6 +93,9 @@ final class PartyBotSelectorTest extends TestCase
         self::assertNull($chosen, $channel->name.' is not party chat and must be left alone');
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function nonPartyChannels(): iterable
     {
         yield 'say' => [ChatChannel::Say];

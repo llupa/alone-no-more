@@ -47,6 +47,9 @@ final class ZoneBoundsTest extends TestCase
         self::assertSame($expected, (new AreaNames($this->dbcDir()))->name($areaId));
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function landmarks(): iterable
     {
         // The night elf starting area, and the cave the Relics of Wakening sit in.

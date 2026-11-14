@@ -48,6 +48,9 @@ final class ErrandRunnerTest extends TestCase
         );
     }
 
+    /**
+     * @return array{id: int, title: string, level: int, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}
+     */
     private function quest(int $id, string $title, bool $complete, int $have = 0, int $need = 8): array
     {
         return [

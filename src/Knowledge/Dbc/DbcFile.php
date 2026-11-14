@@ -84,6 +84,10 @@ final class DbcFile
      */
     public function records(): \Generator
     {
+        if ($this->recordSize < 1) {
+            throw new DbcException(\sprintf('"%s" declares a record size of %d.', $this->path, $this->recordSize));
+        }
+
         fseek($this->handle, self::HEADER_SIZE);
 
         for ($i = 0; $i < $this->recordCount; ++$i) {

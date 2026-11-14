@@ -27,7 +27,7 @@ final class WorldDirectorTest extends TestCase
         $stager = $this->createMock(BotStagerInterface::class);
         $stager->expects(self::once())
             ->method('stage')
-            ->willReturn(new StagingResult(alreadyPresent: 12, target: 50, broughtIn: ['A', 'B'], sentAway: []));
+            ->willReturn(new StagingResult(alreadyPresent: 12, target: 50, broughtIn: [['name' => 'Aelthil', 'level' => 11], ['name' => 'Bazeite', 'level' => 10]], sentAway: []));
 
         $answer = $this->director($this->gatewayFinding(online: true), $stager)->summonCrowd('Doppel', 50);
 

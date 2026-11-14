@@ -131,6 +131,9 @@ final readonly class AzerothCoreGateway implements WorldGatewayInterface
      * class outside the playable set is a server-side oddity, and one bad row must not break a
      * sweep over the whole world.
      */
+    /**
+     * @param array<string, mixed> $row
+     */
     private function hydrate(array $row): ?Actor
     {
         $race = CharacterRace::tryFrom((int) $row['race']);

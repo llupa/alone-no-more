@@ -117,6 +117,9 @@ final readonly class BotRoster
         );
     }
 
+    /**
+     * @return array<int, array{guid: int, name: string, level: int, race: int}>
+     */
     public function dormantPeersOf(Actor $player, int $tolerance, int $limit, ?Faction $faction = null): array
     {
         // Race decides faction, and the dormant rows carry only a race id, so the filter is a
@@ -241,6 +244,11 @@ final readonly class BotRoster
      * by a version of this code that got the timing wrong — stands still forever otherwise,
      * and there is nothing in its state we can cheaply distinguish from a bot that is simply
      * pausing. Re-ordering one that is already busy costs nothing.
+     *
+     * @return string[]
+     */
+    /**
+     * @param int[] $excludeGuids
      *
      * @return string[]
      */

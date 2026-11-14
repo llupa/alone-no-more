@@ -38,6 +38,9 @@ final class AreaNamesTest extends TestCase
         self::assertSame($expected, $this->areaNames()->name($areaId));
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function knownAreas(): iterable
     {
         yield 'a zone' => [141, 'Teldrassil'];

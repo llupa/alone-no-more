@@ -85,6 +85,9 @@ final readonly class ChatEventRepository implements ChatEventRepositoryInterface
         return array_reverse(array_values(array_filter(array_map($this->hydrate(...), $rows))));
     }
 
+    /**
+     * @param array<string, mixed> $row
+     */
     private function hydrate(array $row): ?ChatEvent
     {
         // Channels we do not model (system, loot, combat log) are logged but not answerable.

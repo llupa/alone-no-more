@@ -47,7 +47,7 @@ final class McpServerTest extends KernelTestCase
 
         sort($names);
 
-        return array_values($names);
+        return $names;
     }
 
     #[DataProvider('expectedTools')]
@@ -56,6 +56,9 @@ final class McpServerTest extends KernelTestCase
         self::assertContains($tool, $this->toolNames());
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function expectedTools(): iterable
     {
         yield 'where a character is' => ['world_player_state'];
@@ -97,7 +100,7 @@ final class McpServerTest extends KernelTestCase
         $readOnly = [];
 
         foreach ($this->registry()->getTools() as $tool) {
-            if (true === ($tool->annotations?->readOnlyHint ?? false)) {
+            if (true === ($tool->annotations->readOnlyHint ?? false)) {
                 $readOnly[] = $tool->name;
             }
         }
@@ -118,6 +121,6 @@ final class McpServerTest extends KernelTestCase
         $expected = array_map(static fn (array $case): string => $case[0], iterator_to_array(self::expectedTools()));
         sort($expected);
 
-        self::assertSame(array_values($expected), $this->toolNames());
+        self::assertSame($expected, $this->toolNames());
     }
 }

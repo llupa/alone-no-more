@@ -189,7 +189,8 @@ every fact in a prompt comes from the server's own tables.
 ## Development
 
 ```bash
-bin/phpunit                                   # 174 tests
+bin/phpunit                                   # 248 tests
+vendor/bin/phpstan analyse                    # level 8, src and tests
 bin/console lint:container                    # DI must stay green
 vendor/bin/php-cs-fixer fix                   # @Symfony ruleset
 bin/console anm:snapshot Doppel               # recapture the replay fixture

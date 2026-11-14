@@ -21,7 +21,7 @@ final readonly class PlaceProvider implements ContextProviderInterface
     {
     }
 
-    public function contribute(RoleplayContext $context): ?string
+    public function contribute(RoleplayContext $context): string
     {
         $bot = $context->bot;
         $lines = [];

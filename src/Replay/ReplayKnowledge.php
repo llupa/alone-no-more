@@ -54,7 +54,7 @@ final class ReplayKnowledge implements GameKnowledgeInterface
 
         usort($near, static fn (array $a, array $b): int => $a['nearest_yards'] <=> $b['nearest_yards']);
 
-        return \array_slice(array_values($near), 0, $limit);
+        return \array_slice($near, 0, $limit);
     }
 
     public function questsForZone(int $zoneId, int $level, int $tolerance = 6, int $limit = 6): array

@@ -52,6 +52,9 @@ final class GameLinkTest extends TestCase
         self::assertSame([], GameLink::parseAll($message));
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function plainMessages(): iterable
     {
         yield 'ordinary' => ['how many quests do you have?'];

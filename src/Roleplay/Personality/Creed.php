@@ -33,7 +33,6 @@ final readonly class Creed
             CharacterClass::Shaman => 'Ask what the elements think of a thing before you say what you think.',
             CharacterClass::Druid => 'Measure everything against the balance of the wild, and say when it is out.',
             CharacterClass::DeathKnight => 'Speak of your own death plainly, and of the living as though you are not quite one of them.',
-            default => 'Do the work in front of you and do it properly.',
         };
     }
 
@@ -42,7 +41,6 @@ final readonly class Creed
         return match ($faction) {
             Faction::Alliance => 'Speak ill of the Horde whenever they come up.',
             Faction::Horde => 'Speak ill of the Alliance whenever they come up.',
-            default => '',
         };
     }
 }

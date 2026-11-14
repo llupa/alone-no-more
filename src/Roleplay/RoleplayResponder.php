@@ -33,9 +33,6 @@ use Symfony\AI\Platform\Message\Message;
  */
 final readonly class RoleplayResponder
 {
-    /** WoW drops any chat line longer than this outright. */
-    private const MAX_CHAT_LENGTH = 255;
-
     public function __construct(
         private WorldGatewayInterface $world,
         private GroupRepositoryInterface $groups,
@@ -65,9 +62,9 @@ final readonly class RoleplayResponder
         // An order to a bot is not conversation. mod-playerbots already routes these to the bot
         // and acts on them; answering as well means talking over the thing the player actually
         // asked for — a whispered "grind" got a reply about chanting instead of a bot grinding.
-        // Combat orders are ours: see PlayerbotVocabulary::OURS for why deferring them was
-        // worse than useless.
-        if (PlayerbotVocabulary::isCommand($event->message) && !PlayerbotVocabulary::isOursToHandle($event->message)) {
+        // Prefixed lines are the player driving a bot directly, and the mod is listening for
+        // exactly those; everything else is conversation and ours to answer.
+        if (PlayerbotVocabulary::isCommand($event->message)) {
             $this->logger->debug('Leaving "{message}" to the bot command handler', [
                 'message' => $event->message,
             ]);

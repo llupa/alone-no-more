@@ -65,7 +65,7 @@ final class ConversationStore implements ConversationStoreInterface
             ['bot' => $botGuid, 'player' => $playerGuid, 'limit' => $limit],
         );
 
-        return array_reverse($rows);
+        return array_map(self::asLine(...), array_reverse($rows));
     }
 
     /**
@@ -112,7 +112,7 @@ final class ConversationStore implements ConversationStoreInterface
             ['excluded' => ArrayParameterType::INTEGER],
         );
 
-        return array_reverse($rows);
+        return array_map(self::asLine(...), array_reverse($rows));
     }
 
     /**
@@ -182,11 +182,15 @@ final class ConversationStore implements ConversationStoreInterface
      */
     public function familiarBots(int $playerGuid, int $limit = 20): array
     {
-        return $this->connection()->fetchAllAssociative(
+        return array_map(static fn (array $r): array => [
+            'bot_guid' => (int) $r['bot_guid'],
+            'exchanges' => (int) $r['exchanges'],
+            'last_seen' => (string) $r['last_seen'],
+        ], $this->connection()->fetchAllAssociative(
             'SELECT bot_guid, exchanges, last_seen FROM affinity
              WHERE player_guid = :player ORDER BY exchanges DESC, last_seen DESC LIMIT :limit',
             ['player' => $playerGuid, 'limit' => $limit],
-        );
+        ));
     }
 
     public function recentlyActiveBots(int $withinSeconds): array
@@ -210,9 +214,28 @@ final class ConversationStore implements ConversationStoreInterface
         );
     }
 
+    /**
+     * One row of transcript, with the shape callers are promised.
+     *
+     * The driver hands back array<string, mixed>; saying so in the docblock and then returning
+     * it unchanged is a promise nothing checks.
+     *
+     * @param array<string, mixed> $row
+     *
+     * @return array{speaker: string, message: string, said_at: string}
+     */
+    private static function asLine(array $row): array
+    {
+        return [
+            'speaker' => (string) $row['speaker'],
+            'message' => (string) $row['message'],
+            'said_at' => (string) $row['said_at'],
+        ];
+    }
+
     private function connection(): Connection
     {
-        if (null !== $this->connection) {
+        if ($this->connection instanceof Connection) {
             return $this->connection;
         }
 
@@ -220,10 +243,10 @@ final class ConversationStore implements ConversationStoreInterface
             mkdir($dir, 0o775, true);
         }
 
-        $this->connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'path' => $this->path]);
-        $this->migrate($this->connection);
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'path' => $this->path]);
+        $this->migrate($connection);
 
-        return $this->connection;
+        return $this->connection = $connection;
     }
 
     /**

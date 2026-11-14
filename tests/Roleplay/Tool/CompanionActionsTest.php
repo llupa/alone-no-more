@@ -40,12 +40,15 @@ final class CompanionActionsTest extends TestCase
         self::assertStringContainsString('Done', $this->tools($world)->doThis($command));
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function promisedActions(): iterable
     {
-        yield ['follow'];
-        yield ['stay'];
-        yield ['repair'];
-        yield ['dismount'];
+        yield 'follow' => ['follow'];
+        yield 'stay' => ['stay'];
+        yield 'repair' => ['repair'];
+        yield 'dismount' => ['dismount'];
     }
 
     /**
@@ -61,6 +64,9 @@ final class CompanionActionsTest extends TestCase
         self::assertStringContainsString('do not know how', $this->tools($world)->doThis($command));
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function neverPromised(): iterable
     {
         yield 'destroys items' => ['destroy'];

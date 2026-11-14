@@ -15,6 +15,9 @@ final class PositionTest extends TestCase
      * Captured verbatim from the running server, so the parser is tested against the
      * real wire format rather than one we imagined.
      */
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function realServerLines(): iterable
     {
         yield 'bot in Tirisfal' => [
@@ -61,6 +64,9 @@ final class PositionTest extends TestCase
         self::assertSame($zone, $position->zone);
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function malformedLines(): iterable
     {
         yield 'empty' => [''];

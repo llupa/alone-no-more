@@ -81,6 +81,9 @@ final class PersonalityRollerTest extends TestCase
         }
     }
 
+    /**
+     * @return iterable<string, array<int, mixed>>
+     */
     public static function everyRace(): iterable
     {
         foreach (CharacterRace::cases() as $race) {

@@ -98,7 +98,7 @@ final class AreaNames
             }
 
             if (mb_strlen($candidate) < $bestLength) {
-                $best = $id;
+                $best = (int) $id;
                 $bestLength = mb_strlen($candidate);
             }
         }
@@ -170,6 +170,9 @@ final class AreaNames
         return $areas;
     }
 
+    /**
+     * @return array<int, array{name: string, parent: int, map: int, level: int, faction: int}>
+     */
     private function areas(): array
     {
         if (null !== $this->areas) {

@@ -79,6 +79,9 @@ final class ListenCommand
         $io->writeln('<comment>Ctrl-C to stop.</comment>');
         $io->newLine();
 
+        // A daemon: it runs until someone stops it, so the condition really is always true and
+        // the return below really is unreachable. Both are deliberate.
+        // @phpstan-ignore while.alwaysTrue
         while (true) {
             // Positions must be fresh before we decide who is in earshot: AzerothCore only
             // persists them every 15 minutes otherwise.
@@ -151,6 +154,7 @@ final class ListenCommand
             usleep($interval * 1000);
         }
 
+        // @phpstan-ignore deadCode.unreachable
         return Command::SUCCESS;
     }
 

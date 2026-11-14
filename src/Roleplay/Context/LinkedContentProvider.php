@@ -81,6 +81,9 @@ final readonly class LinkedContentProvider implements ContextProviderInterface
         return 30;
     }
 
+    /**
+     * @param array<string, true> $seen
+     */
     private function describeNamedQuest(string $name, RoleplayContext $context, array &$seen): ?string
     {
         $quest = $this->knowledge->findQuestByName($name);
@@ -96,6 +99,9 @@ final readonly class LinkedContentProvider implements ContextProviderInterface
         return '' !== $quest['objective'] ? $line.': '.self::trim($quest['objective']) : $line;
     }
 
+    /**
+     * @param array<string, true> $seen
+     */
     private function describeNamedItem(string $name, RoleplayContext $context, array &$seen): ?string
     {
         $item = $this->knowledge->findItemByName($name);
@@ -111,6 +117,9 @@ final readonly class LinkedContentProvider implements ContextProviderInterface
         return '' !== $item['description'] ? $line.': '.self::trim($item['description']) : $line;
     }
 
+    /**
+     * @param array<string, true> $seen
+     */
     private function describeQuest(GameLink $link, RoleplayContext $context, array &$seen): ?string
     {
         $quest = $this->knowledge->quest($link->id);
@@ -186,6 +195,9 @@ final readonly class LinkedContentProvider implements ContextProviderInterface
         return [] === $lines ? '' : "\n".implode("\n", $lines);
     }
 
+    /**
+     * @param array<string, true> $seen
+     */
     private function describeItem(GameLink $link, RoleplayContext $context, array &$seen): ?string
     {
         $item = $this->knowledge->item($link->id);

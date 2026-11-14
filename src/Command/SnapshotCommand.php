@@ -201,7 +201,7 @@ final class SnapshotCommand
     /**
      * @param Actor[] $actors
      *
-     * @return array<string, int[]>
+     * @return array<int|string, int[]>
      */
     private function groupsOf(array $actors): array
     {
@@ -225,7 +225,7 @@ final class SnapshotCommand
     /**
      * @param Actor[] $actors
      *
-     * @return array<string, array<int, array{id: int, title: string, level: int, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}>>
+     * @return array<int|string, array<int, array{id: int, title: string, level: int, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}>>
      */
     private function questLogsOf(array $actors): array
     {
@@ -300,7 +300,7 @@ final class SnapshotCommand
     /**
      * @param Actor[] $actors
      *
-     * @return array<string, array{name: string, parent: int, map: int, level: int, faction: int}>
+     * @return array<int|string, array{name: string, parent: int, map: int, level: int, faction: int}>
      */
     private function areasOf(array $actors): array
     {
