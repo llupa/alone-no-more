@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace App\World\Model;
 
-use App\Roleplay\Memory\MemoryScope;
-
 /**
  * The subset of WoW's CHAT_MSG_* opcodes we act on, with the raw values the client and server use.
  *
@@ -66,21 +64,6 @@ enum ChatChannel: int
         return match ($this) {
             self::Say, self::Yell, self::Channel, self::Emote, self::TextEmote => true,
             default => false,
-        };
-    }
-
-    /**
-     * Who, besides the speaker, heard this line — and so whose memory it belongs in.
-     *
-     * Party chat is one conversation among several people, not several private ones. Storing it
-     * per bot-and-player pair leaves each member deaf to what the others just said.
-     */
-    public function memoryScope(): MemoryScope
-    {
-        return match ($this) {
-            self::Whisper => MemoryScope::Private,
-            self::Say, self::Yell, self::Channel, self::Emote, self::TextEmote => MemoryScope::Vicinity,
-            default => MemoryScope::Group,
         };
     }
 

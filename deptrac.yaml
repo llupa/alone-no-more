@@ -1,0 +1,123 @@
+# The layers this project is built in, and which way the dependencies may run.
+#
+# Written after deptrac found three real breaches in code that looked fine: a chat channel that
+# knew what a memory was, the archives reaching up for the asker's position, and a cycle between
+# Director and Herding. None of them were visible by reading; all three are the kind that only
+# hurt later, when something has to move.
+#
+# The rule throughout is that a layer may depend downward and never upward. Where a lower layer
+# genuinely needs something from above — the herder needs to know which bots are spoken for — it
+# declares an interface and the higher layer implements it.
+deptrac:
+  paths:
+    - ./src
+
+  layers:
+    # The bottom. Reading and driving a running AzerothCore, and the value objects that describe
+    # it. Depends on nothing of ours.
+    - name: World
+      collectors:
+        - type: directory
+          value: src/World/.*
+
+    # Runtime preferences, written over MCP and read by three layers. Low on purpose: things
+    # everything depends on cannot live in the layer that orchestrates everything.
+    - name: Config
+      collectors:
+        - type: directory
+          value: src/Config/.*
+
+    # The game's own data: quests, items, loot, geography.
+    - name: Knowledge
+      collectors:
+        - type: directory
+          value: src/Knowledge/.*
+
+    # Normalising what a model hands back.
+    - name: Ai
+      collectors:
+        - type: directory
+          value: src/Ai/.*
+
+    # Keeping the player's zone populated.
+    - name: Herding
+      collectors:
+        - type: directory
+          value: src/Herding/.*
+
+    # Companions: who answers, what they know, how they speak, what they remember.
+    - name: Roleplay
+      collectors:
+        - type: directory
+          value: src/Roleplay/.*
+
+    # Who is playing, and what they have asked for in advance. Below Roleplay: these are facts
+    # about the session, not about any conversation.
+    - name: Director
+      collectors:
+        - type: directory
+          value: src/Director/.*
+
+    # The two ways in: MCP for an assistant, the console for a person.
+    - name: Mcp
+      collectors:
+        - type: directory
+          value: src/Mcp/.*
+
+    - name: Command
+      collectors:
+        - type: directory
+          value: src/Command/.*
+
+    # Standing in for the world when there is no server. Implements the interfaces the real
+    # services do, so it sits beside them rather than above.
+    - name: Replay
+      collectors:
+        - type: directory
+          value: src/Replay/.*
+
+  ruleset:
+    World: ~
+    Config: ~
+    Ai: ~
+    Knowledge:
+      - World
+    Herding:
+      - World
+      - Config
+      - Knowledge
+    Roleplay:
+      - World
+      - Config
+      - Knowledge
+      - Ai
+      # Roleplay implements Herding's ProtectedBots: a companion mid-conversation must survive a
+      # dismissal sweep, and the herder must not have to know why.
+      - Herding
+      # Director sits *below* Roleplay, which took a violation to see clearly. It answers "who
+      # is playing" and "who did they ask for" — facts about the session that a companion may
+      # consult and that never depend on anything a companion does.
+      - Director
+    Director:
+      - World
+      - Config
+      - Herding
+    Replay:
+      - World
+      - Knowledge
+      - Herding
+    Mcp:
+      - World
+      - Config
+      - Knowledge
+      - Herding
+      - Roleplay
+      - Director
+    Command:
+      - World
+      - Config
+      - Knowledge
+      - Ai
+      - Herding
+      - Roleplay
+      - Director

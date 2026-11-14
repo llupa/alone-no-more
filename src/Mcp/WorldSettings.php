@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mcp;
 
-use App\Director\Settings;
+use App\Config\Settings;
 use App\World\WorldGatewayInterface;
 use Mcp\Capability\Attribute\McpTool;
 use Mcp\Schema\ToolAnnotations;

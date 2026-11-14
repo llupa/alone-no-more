@@ -8,7 +8,7 @@ use App\Knowledge\Bearing;
 use App\Knowledge\Dbc\AreaNames;
 use App\Knowledge\Dbc\ZoneBounds;
 use App\Knowledge\GameKnowledgeInterface;
-use App\Roleplay\Tool\BotCommandContext;
+use App\Knowledge\Viewpoint;
 use App\World\Model\Position;
 use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
 
@@ -72,7 +72,7 @@ final readonly class ArchiveTools
         private GameKnowledgeInterface $knowledge,
         private AreaNames $areas,
         private ZoneBounds $zones,
-        private BotCommandContext $context,
+        private Viewpoint $asker,
     ) {
     }
 
@@ -310,9 +310,8 @@ final readonly class ArchiveTools
             // tool from inside a conversation, so the acting bot — standing with the player — is
             // the right frame of reference. Over MCP there is no bot, and the zone alone is the
             // honest answer.
-            $bearing = $this->context->isActive()
-                ? Bearing::from($this->context->bot()->position, $where)
-                : null;
+            $here = $this->asker->position();
+            $bearing = null !== $here ? Bearing::from($here, $where) : null;
 
             $lines[] = match (true) {
                 null !== $bearing && null !== $zone => \sprintf('%s is %s, in %s.', $creature['name'], $bearing->describe(), $zone),

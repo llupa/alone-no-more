@@ -4,21 +4,15 @@ declare(strict_types=1);
 
 namespace App\Tests\Herding;
 
-use App\Director\CompanionRequests;
-use App\Director\CompanionsOnCall;
-use App\Herding\BotRoster;
 use App\Herding\BotStagerInterface;
 use App\Herding\HerdingWatcher;
+use App\Herding\ProtectedBots;
 use App\Herding\StagingResult;
-use App\Roleplay\Memory\ConversationStoreInterface;
-use App\World\Chat\BotSpeechDispatcher;
 use App\World\Model\Actor;
 use App\World\Model\CharacterClass;
 use App\World\Model\CharacterRace;
 use App\World\Model\Gender;
 use App\World\Model\Position;
-use App\World\WorldGatewayInterface;
-use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\MockObject\MockObject;
 use PHPUnit\Framework\TestCase;
 
@@ -39,27 +33,20 @@ final class HerdingWatcherTest extends TestCase
 
     private function watcher(int $settle = 60, int $refresh = 180): HerdingWatcher
     {
-        $conversations = $this->createStub(ConversationStoreInterface::class);
-        $conversations->method('recentlyActiveBots')->willReturn([]);
-
-        return new HerdingWatcher($this->stager, $conversations, $this->nobodyOnCall(), $settle, $refresh);
+        // Nobody has a claim on anyone, which is the ordinary case. The herder no longer knows
+        // what a conversation or a standing request is — only that something may object.
+        return new HerdingWatcher($this->stager, $this->noClaims(), $settle, $refresh);
     }
 
     /**
-     * Nobody has asked for a companion by name, which is the ordinary case. Built from real
-     * collaborators over stub connections: these paths never reach the database, and that beats
-     * widening production code to suit a test.
+     * @return iterable<ProtectedBots>
      */
-    private function nobodyOnCall(): CompanionsOnCall
+    private function noClaims(): iterable
     {
-        $connection = $this->createStub(Connection::class);
+        $claim = $this->createStub(ProtectedBots::class);
+        $claim->method('protectedFor')->willReturn([]);
 
-        return new CompanionsOnCall(
-            new CompanionRequests(sys_get_temp_dir().'/anm-oncall-'.bin2hex(random_bytes(6)).'.sqlite'),
-            $this->createStub(WorldGatewayInterface::class),
-            new BotRoster($connection),
-            new BotSpeechDispatcher($connection),
-        );
+        return [$claim];
     }
 
     private static function playerIn(int $zoneId): Actor

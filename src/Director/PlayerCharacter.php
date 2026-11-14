@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Director;
 
+use App\Config\Settings;
 use App\World\Model\Actor;
 use App\World\WorldGatewayInterface;
 

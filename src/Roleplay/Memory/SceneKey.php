@@ -23,7 +23,7 @@ final class SceneKey
      */
     public static function for(ChatEvent $event, Actor $speaker): ?string
     {
-        return match ($event->channel->memoryScope()) {
+        return match (MemoryScope::of($event->channel)) {
             MemoryScope::Private => null,
             MemoryScope::Group => 'party:'.$speaker->guid,
             MemoryScope::Vicinity => 'near:'.$speaker->zoneId,

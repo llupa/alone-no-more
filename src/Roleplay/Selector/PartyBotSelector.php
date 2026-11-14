@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Roleplay\Selector;
 
-use App\Director\Settings;
+use App\Config\Settings;
 use App\Roleplay\Memory\ConversationStoreInterface;
 use App\World\GroupRepositoryInterface;
 use App\World\Model\Actor;

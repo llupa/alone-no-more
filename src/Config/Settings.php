@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace App\Director;
+namespace App\Config;
 
 use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\DriverManager;
@@ -10,6 +10,11 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
  * What the director has been told to do, as opposed to what it was configured to do.
+ *
+ * In its own low layer rather than in Director, because three layers read it — the herder sizes
+ * a crowd by it, the selector paces replies by it, and the MCP tools write it. Configuration
+ * that everything depends on cannot live in the layer that orchestrates everything, or the
+ * dependencies run both ways.
  *
  * Everything here has a sensible default in `.env`, which is where a value belongs if it is a
  * property of the installation: a database DSN, a model name, how long to wait for a bot to

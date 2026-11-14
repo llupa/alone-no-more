@@ -4,12 +4,11 @@ declare(strict_types=1);
 
 namespace App\Herding;
 
-use App\Director\CompanionsOnCall;
-use App\Roleplay\Memory\ConversationStoreInterface;
 use App\World\Model\Actor;
 use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Symfony\Component\DependencyInjection\Attribute\AutowireIterator;
 
 /**
  * Follows the player and keeps the world populated around them.
@@ -35,8 +34,15 @@ final class HerdingWatcher
 
     public function __construct(
         private readonly BotStagerInterface $stager,
-        private readonly ConversationStoreInterface $conversations,
-        private readonly CompanionsOnCall $onCall,
+        /**
+         * Everyone with a claim on a bot. The herder does not ask why — a companion mid
+         * conversation and one asked for by name are protected for quite different reasons,
+         * and neither reason is the crowd layer's business.
+         *
+         * @var iterable<ProtectedBots>
+         */
+        #[AutowireIterator(ProtectedBots::class)]
+        private readonly iterable $claims,
         /** How long an arrival must hold before we believe it. */
         #[Autowire(env: 'int:ANM_HERD_SETTLE_SECONDS')]
         private readonly int $settleSeconds = 60,
@@ -46,9 +52,6 @@ final class HerdingWatcher
         /** Beyond this, a bot is somewhere the player no longer is. */
         #[Autowire(env: 'float:ANM_HERD_DISMISS_BEYOND')]
         private readonly float $dismissBeyond = 1200.0,
-        /** A bot that spoke this recently is left alone wherever it stands. */
-        #[Autowire(env: 'int:ANM_HERD_PROTECT_SPOKEN_WITHIN')]
-        private readonly int $protectSpokenWithin = 600,
         /**
          * How long to let a bot finish arriving before telling it what to do.
          *
@@ -156,12 +159,11 @@ final class HerdingWatcher
 
         // Anyone mid-conversation stays, wherever they are standing. A companion vanishing
         // between your question and its answer reads as the world breaking, not as housekeeping.
-        $protected = array_merge(
-            $this->conversations->recentlyActiveBots($this->protectSpokenWithin),
-            // Someone asked for by name is never churn. A crowd is meant to turn over; a
-            // companion you asked for is the opposite of a crowd.
-            $this->onCall->protectedFor($player),
-        );
+        $protected = [];
+
+        foreach ($this->claims as $claim) {
+            $protected = array_merge($protected, $claim->protectedFor($player));
+        }
 
         $sentAway = $this->stager->dismissDistant($player, $this->dismissBeyond, $protected);
         $staged = $this->stager->stage($player);

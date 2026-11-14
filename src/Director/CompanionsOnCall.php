@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Director;
 
 use App\Herding\BotRoster;
+use App\Herding\ProtectedBots;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\Model\Actor;
 use App\World\WorldGatewayInterface;
@@ -18,7 +19,7 @@ use Psr\Log\NullLogger;
  * if they are not already there; and tell the herder never to send them away again, because a
  * crowd is churn by design and the whole point of asking for someone is that they stay.
  */
-final readonly class CompanionsOnCall
+final readonly class CompanionsOnCall implements ProtectedBots
 {
     public function __construct(
         private CompanionRequests $requests,

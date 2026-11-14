@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Director;
 
-use App\Director\Settings;
+use App\Config\Settings;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\TestCase;
 

@@ -191,6 +191,7 @@ every fact in a prompt comes from the server's own tables.
 ```bash
 bin/phpunit                                   # 248 tests
 vendor/bin/phpstan analyse                    # level 8, src and tests
+vendor/bin/deptrac analyse                    # layers may depend downward only
 bin/console lint:container                    # DI must stay green
 vendor/bin/php-cs-fixer fix                   # @Symfony ruleset
 bin/console anm:snapshot Doppel               # recapture the replay fixture
@@ -199,6 +200,12 @@ bin/console anm:snapshot Doppel               # recapture the replay fixture
 Every outbound integration sits behind an interface — `WorldGatewayInterface`,
 `GameKnowledgeInterface`, `QuestLogInterface`, `BotStagerInterface` — which is what lets the
 replay implementations be first-class rather than test doubles bolted on afterwards.
+
+The layers run one way, and `deptrac.yaml` enforces it: World and Config at the bottom, then
+Knowledge, Herding, Director, Roleplay, and the two ways in — MCP and the console — on top.
+Where a lower layer genuinely needs something from above, it declares an interface and the
+higher layer implements it: `Herding\ProtectedBots` is how a companion mid-conversation
+survives a dismissal sweep without the crowd layer ever learning what a conversation is.
 
 ## Licence
 

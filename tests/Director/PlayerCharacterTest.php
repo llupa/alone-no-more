@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Tests\Director;
 
+use App\Config\Settings;
 use App\Director\PlayerCharacter;
-use App\Director\Settings;
 use App\Tests\Roleplay\ActorMother;
 use App\World\Model\Actor;
 use App\World\WorldGatewayInterface;

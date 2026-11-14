@@ -50,6 +50,9 @@
             "bin/phpunit"
         ]
     },
+    "qossmic/deptrac": {
+        "version": "2.0.4"
+    },
     "symfony/ai-anthropic-platform": {
         "version": "1.0",
         "recipe": {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace App\Herding;
 
-use App\Director\Settings;
+use App\Config\Settings;
 use App\Knowledge\Dbc\AreaNames;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\GroupRepositoryInterface;

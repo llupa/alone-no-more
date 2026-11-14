@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Command;
 
+use App\Config\Settings;
 use App\Director\CompanionsOnCall;
 use App\Director\PlayerCharacter;
-use App\Director\Settings;
 use App\Herding\HerdingWatcher;
 use App\Roleplay\AgentProvider;
 use App\Roleplay\Banter\BanterDirector;
