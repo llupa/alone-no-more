@@ -50,6 +50,9 @@ final class CompanionActionsTest extends TestCase
         yield 'stay' => ['stay'];
         yield 'repair' => ['repair'];
         yield 'dismount' => ['dismount'];
+        // Gear, added after a companion had to refuse a reasonable request.
+        yield 'equip upgrade' => ['equip upgrade'];
+        yield 'autogear' => ['autogear'];
     }
 
     /**
@@ -75,6 +78,34 @@ final class CompanionActionsTest extends TestCase
         yield 'kicks a guild member' => ['guild remove'];
         yield 'drops something' => ['drop'];
         yield 'invented entirely' => ['perform a heroic charge'];
+    }
+
+    public function testItWearsSomethingByName(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->expects(self::once())
+            ->method('execute')
+            ->with("playerbots exec Menelan !e Journeyman's Pants")
+            ->willReturn('ok');
+
+        self::assertStringContainsString(
+            "Journeyman's Pants",
+            $this->tools($world)->wearThis("Journeyman's Pants"),
+        );
+    }
+
+    /**
+     * The name reaches a GM console, so it has to look like a name.
+     */
+    public function testSomethingThatIsNotAnItemNameIsRefused(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->expects(self::never())->method('execute');
+
+        self::assertStringContainsString(
+            'not the name of a thing',
+            $this->tools($world)->wearThis("pants\nserver shutdown 1"),
+        );
     }
 
     /**

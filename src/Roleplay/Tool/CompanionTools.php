@@ -79,6 +79,16 @@ use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
     method: 'stopFighting',
 )]
 #[AsTool(
+    name: 'wear_this',
+    description: <<<'TXT'
+        Put on something that is already in your bags. Use when the player names a piece of gear
+        and asks you to wear or equip it. You can only wear what you are carrying — if they are
+        still holding it, say so and ask them to hand it over. For "put on anything better you
+        are carrying", use do_this with "equip upgrade" instead.
+        TXT,
+    method: 'wearThis',
+)]
+#[AsTool(
     name: 'check_experience',
     description: <<<'TXT'
         How far you or the player are through your current level. Use for "how much more xp do
@@ -129,6 +139,10 @@ final readonly class CompanionTools
         'follow', 'stay', 'attack', 'flee', 'runaway', 'grind', 'revive', 'release', 'repair',
         'buff', 'rebuff', 'ready', 'pull', 'disperse', 'leave', 'invite', 'taxi', 'home',
         'drink', 'mount', 'dismount',
+        // Gear, added after a companion had to refuse a reasonable request. Both take no
+        // arguments and touch only the bot's own bags, which is why they can sit in the bare
+        // verb list while equipping a *named* item needs its own tool.
+        'equip upgrade', 'autogear',
     ];
 
     public function __construct(
@@ -363,6 +377,29 @@ final readonly class CompanionTools
         }
 
         return [null, null];
+    }
+
+    /**
+     * @param string $item the name of a piece of gear in the companion's own bags
+     */
+    public function wearThis(string $item): string
+    {
+        $item = trim($item);
+
+        // Item names, not commands. The mod's `e` takes a name or a link and acts only on the
+        // bot's own inventory, so the risk here is low — but the string still reaches a GM
+        // console, and a name is a short line of ordinary words.
+        if (1 !== preg_match("/^[A-Za-z0-9 '\\-]{2,40}$/", $item)) {
+            return \sprintf('"%s" is not the name of a thing you could be wearing.', $item);
+        }
+
+        try {
+            $this->runner->run($this->context->bot()->name, 'e '.$item);
+
+            return \sprintf('You have put on the %s, if it was in your bags.', $item);
+        } catch (WorldGatewayException $e) {
+            return 'You could not: '.$e->getMessage();
+        }
     }
 
     /**
