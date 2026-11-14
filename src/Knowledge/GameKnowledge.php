@@ -287,14 +287,14 @@ final readonly class GameKnowledge implements GameKnowledgeInterface
      * The two questions differ: "what can I fight right now" must exclude a corpse, while "where
      * does Milly Osworth stand" is about where she lives, and she will be back.
      *
-     * @return array<int, array{name: string, level_min: int, level_max: int, spawns: int, map: int, x: float, y: float}>
+     * @return array<int, array{name: string, level_min: int, level_max: int, spawns: int, map: int, x: float, y: float, z: float}>
      */
     public function findCreatures(string $name, int $limit = 5): array
     {
         $rows = $this->world->fetchAllAssociative(
             <<<'SQL'
                 SELECT ct.name, ct.minlevel, ct.maxlevel, COUNT(*) AS spawns,
-                       c.map, AVG(c.position_x) AS x, AVG(c.position_y) AS y
+                       c.map, AVG(c.position_x) AS x, AVG(c.position_y) AS y, AVG(c.position_z) AS z
                 FROM creature c
                 JOIN creature_template ct ON ct.entry = c.id
                 WHERE ct.name LIKE :like
@@ -318,6 +318,7 @@ final readonly class GameKnowledge implements GameKnowledgeInterface
             'map' => (int) $r['map'],
             'x' => (float) $r['x'],
             'y' => (float) $r['y'],
+            'z' => (float) $r['z'],
         ], $rows);
     }
 

@@ -40,6 +40,17 @@ namespace AnmBridge
 
     // Drains anm_outbox. Called from the world update on a fixed interval.
     void DrainOutbox();
+
+    // Walks the bots that have somewhere to be, one short hop at a time. Called from the world
+    // update, more often than the outbox is drained, because this is movement.
+    //
+    // Leading a player to an NPC is the third thing that cannot be done from outside the
+    // worldserver, and it took six attempts through mod-playerbots' chat commands to accept
+    // that. Every route out there is leashed to `Playerbots.ReactDistance` (150 yards):
+    // `ReturnToStayPositionAction::isPossible()` throws away a stay anchor beyond it, and
+    // `GoAction`'s coordinate form refuses outright. Inside, there is no leash — only
+    // pathfinding, which is handled by walking in hops.
+    void DriveLeads();
 }
 
 #endif

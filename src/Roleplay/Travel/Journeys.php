@@ -11,10 +11,12 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\NullLogger;
 
 /**
- * Watches companions who are walking somewhere, and tells them to wait when they arrive.
+ * Watches companions who are walking somewhere, so that arriving is something they can say.
  *
- * Runs on the listener's loop, which already refreshes positions every pass — so arrival is
- * simply a distance check against a table that is seconds old, with nothing new to poll.
+ * The walking itself belongs to mod-anm-bridge now — see {@see LeadOrders} for why it had to
+ * move inside the worldserver. All that is left out here is noticing, which the listener's loop
+ * already has the data for: it refreshes every position each pass, so arrival is a distance
+ * check against a table that is seconds old, with nothing new to poll.
  */
 final class Journeys
 {
@@ -31,6 +33,21 @@ final class Journeys
     public function start(Journey $journey): void
     {
         $this->walking[$journey->botGuid] = $journey;
+    }
+
+    /**
+     * Who is walking somewhere right now.
+     *
+     * Asked for by the listener so that {@see \App\Director\CompanionsOnCall} does not haul a
+     * companion back while they are leading: walking ahead to an NPC looks exactly like having
+     * wandered off, and the recall teleported one mid-journey — "did you bug out and fly to
+     * Goldshire?".
+     *
+     * @return int[]
+     */
+    public function walkingGuids(): array
+    {
+        return array_keys($this->walking);
     }
 
     public function cancel(int $botGuid): void
@@ -78,17 +95,8 @@ final class Journeys
                 unset($this->walking[$guid]);
                 $news[$guid] = \sprintf('%s reached %s and is waiting there', $bot->name, $journey->towards);
 
-                // Already holding position: the walk was driven by `stay` anchored at the
-                // destination, so the companion stops there of its own accord. Re-anchoring on
-                // the spot it actually reached settles it exactly where it stands, instead of
-                // leaving it shuffling against a target z we guessed from its own height at
-                // the other end of the walk.
-                try {
-                    $this->runner->anchorAt($bot->name, $bot->position->x, $bot->position->y, $bot->position->z);
-                } catch (WorldGatewayException $e) {
-                    $this->logger->warning('{bot} would not settle: {why}', ['bot' => $bot->name, 'why' => $e->getMessage()]);
-                }
-
+                // Nothing to send. The module stops the companion where it arrives and forgets
+                // the destination itself, which is the whole reason this is a watcher now.
                 continue;
             }
 
@@ -96,26 +104,18 @@ final class Journeys
                 unset($this->walking[$guid]);
                 $news[$guid] = \sprintf('%s could not reach %s', $bot->name, $journey->towards);
 
-                // Following was switched off to let them walk. A failed journey must not leave
-                // a companion standing in a field for the rest of the evening.
+                // Following was switched off to let them walk, and a failed journey must not
+                // leave a companion standing in a field for the rest of the evening. The
+                // module gives up on its own clock too, so this is only about the strategy.
                 $this->tell($bot->name, 'follow');
 
                 continue;
             }
 
-            // Still walking. The anchor does the moving; this drags it along the route, a leg
-            // at a time, and re-sends it every pass.
-            //
-            // Both halves are load-bearing. Anything beyond `Playerbots.ReactDistance` is
-            // discarded by the mod and replaced with wherever the bot is standing, so the leg
-            // has to stay short. And the anchor is destroyed behind our back —
-            // `PlayerbotAI::ChangeEngineOnNonCombat()` resets the stay position whenever a bot
-            // leaves combat — so re-sending only on arrival deadlocked the moment anything
-            // attacked: the companion could not reach a leg whose anchor no longer existed.
-            // Re-sending cannot be unconditional either: each one makes the companion whisper
-            // "Position stay is set" at the player. So it goes out when a leg is walked, or
-            // when nothing has moved for a while — the only outward sign that the anchor was
-            // taken away.
+            // Still walking, and nothing to do about it but keep count. Every attempt to
+            // help from out here made things worse: re-sent destinations were dropped by
+            // `IsDuplicateMove`, and re-anchoring whispered "Position stay is set" at the
+            // player once a second.
             $togo = hypot(
                 $bot->position->x - $journey->destination->x,
                 $bot->position->y - $journey->destination->y,
@@ -127,23 +127,6 @@ final class Journeys
                 'towards' => $journey->towards,
                 'elapsed' => (int) round($now - $journey->startedAt),
             ]);
-
-            if (!$journey->needsAnchor($bot->position, $now)) {
-                $journey->wasAt = $bot->position;
-
-                continue;
-            }
-
-            $leg = $journey->nextLeg($bot->position);
-
-            try {
-                $this->runner->anchorAt($bot->name, $leg->x, $leg->y, $leg->z);
-                $journey->anchor = $leg;
-                $journey->anchoredAt = $now;
-                $journey->wasAt = $bot->position;
-            } catch (WorldGatewayException $e) {
-                $this->logger->warning('Could not set {bot} on the next leg: {why}', ['bot' => $bot->name, 'why' => $e->getMessage()]);
-            }
         }
 
         return $news;

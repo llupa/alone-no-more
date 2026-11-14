@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Roleplay\Tool;
 
 use App\Knowledge\BagsInterface;
+use App\Knowledge\Dbc\ZoneBounds;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
@@ -13,8 +14,10 @@ use App\Roleplay\Tool\BotCommandContext;
 use App\Roleplay\Tool\CompanionTools;
 use App\Roleplay\Tool\PlayerbotCommandRunner;
 use App\Roleplay\Travel\Journeys;
+use App\Roleplay\Travel\LeadOrders;
 use App\Tests\Roleplay\ActorMother;
 use App\World\Chat\BotSpeechDispatcher;
+use App\World\Outbox;
 use App\World\WorldGatewayInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\TestCase;
@@ -88,6 +91,8 @@ final class CheckExperienceTest extends TestCase
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
             new Journeys($world, $runner),
+            new LeadOrders(new Outbox($this->createStub(Connection::class))),
+            new ZoneBounds('/nonexistent'),
         );
     }
 }

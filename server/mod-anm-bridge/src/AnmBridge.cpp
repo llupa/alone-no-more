@@ -12,6 +12,9 @@
 #include "GuildMgr.h"
 #include "Log.h"
 #include "ObjectAccessor.h"
+#include "PositionValue.h"
+#include "Event.h"
+#include "MovementActions.h"
 #include "MotionMaster.h"
 #include "PlayerbotAI.h"
 #include "PlayerbotMgr.h"
@@ -23,8 +26,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
+#include <cstdio>
 #include <list>
 #include <sstream>
+#include <unordered_map>
 
 namespace
 {
@@ -43,6 +49,64 @@ namespace
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
         return value;
     }
+
+    // A way in to mod-playerbots' own movement code.
+    //
+    // `MovementAction::MoveTo` is protected, and its constructor is not, so a subclass is the
+    // whole trick. It is worth the trick: that function is the one the mod uses to make bots
+    // follow smoothly, and it does properly all the things I got wrong by hand. It resolves
+    // ground height with `GetMapHeight` instead of guessing from where the bot stands; it
+    // tries several heights to find a route (`SearchForBestPath`); and with `normal_only` it
+    // accepts only PATHFIND_NORMAL or PATHFIND_INCOMPLETE, returning INVALID_HEIGHT rather
+    // than the PATHFIND_SHORTCUT — "travel through obstacles, terrain, air" — that walked a
+    // companion under the world twice.
+    //
+    // The 150-yard leash is not in here. It lives in the callers: `GoAction` refuses a far
+    // coordinate outright, and `ReturnToStayPositionAction::isPossible()` discards a far
+    // anchor. Calling this directly, in hops, is the mod's own navigation without its leash.
+    class AnmMover : public MovementAction
+    {
+    public:
+        explicit AnmMover(PlayerbotAI* botAI) : MovementAction(botAI, "anm lead") { }
+
+        using MovementAction::MoveTo;
+
+        bool Execute(Event /*event*/) override { return false; }
+    };
+
+    // Where a bot has been told to walk, and how far along it is.
+    //
+    // Held in memory on purpose. The alternative — a row the bot re-reads every tick — is what
+    // the PHP side was doing through chat commands, and the thing that kept destroying it was
+    // state the server reset behind our back (`ChangeEngineOnNonCombat()` clears the stay
+    // position every time a bot leaves combat). A destination that lives here cannot be cleared
+    // by the bot's own AI, so a fight on the way is just a pause.
+    struct Lead
+    {
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+        uint32 mapId = 0;
+        uint32 stuckFor = 0;     // ms spent not getting closer
+        float lastDistance = 0.0f;
+    };
+
+    std::unordered_map<uint32 /*bot low guid*/, Lead> g_leads;
+
+    // How close counts as arrived. The player follows the bot, so stopping a few paces off the
+    // NPC is better than standing inside it.
+    constexpr float LEAD_ARRIVED_YARDS = 6.0f;
+
+    // A bot that has not closed the gap in this long has lost its way: bad terrain, a wall, a
+    // path that does not exist. Giving up beats jogging into a rock for the rest of the evening.
+    constexpr uint32 LEAD_STUCK_MS = 20000;
+
+    // How often DriveLeads runs, which it needs to know to measure being stuck. Kept in step
+    // with the caller in anm_bridge_loader.cpp.
+    constexpr uint32 LEAD_INTERVAL_MS = 500;
+
+    // Our own MovePoint id, so a hop of ours is distinguishable from the bot AI's own movement.
+    constexpr uint32 ANM_LEAD_POINT_ID = 0x414E4D01;
 
     // The nearest thing the bot may lawfully hit, optionally filtered by what the player called
     // it. "kill at least 4 kobolds" names a kind, not a creature, so the match is a substring of
@@ -215,6 +279,105 @@ void AnmBridge::RecordChat(Player* sender, uint32 type, uint32 lang, std::string
     CharacterDatabase.Execute(q.str());
 }
 
+void AnmBridge::DriveLeads()
+{
+    if (g_leads.empty())
+        return;
+
+    for (auto it = g_leads.begin(); it != g_leads.end();)
+    {
+        Player* bot = ObjectAccessor::FindPlayerByLowGUID(it->first);
+
+        if (!bot || !bot->IsInWorld() || !bot->IsAlive() || bot->GetMapId() != it->second.mapId)
+        {
+            it = g_leads.erase(it);
+            continue;
+        }
+
+        // Let the bot fight. Its combat engine is better at that than we are, and the
+        // destination is held here rather than in anything combat can reset, so the walk simply
+        // resumes when the fight is over. This is the case that defeated every previous
+        // attempt: one wandering boar used to strand a companion permanently.
+        if (bot->IsInCombat())
+        {
+            it->second.stuckFor = 0;
+            ++it;
+            continue;
+        }
+
+        float const distance = bot->GetExactDist2d(it->second.x, it->second.y);
+
+        if (distance <= LEAD_ARRIVED_YARDS)
+        {
+            bot->GetMotionMaster()->Clear();
+            bot->GetMotionMaster()->MoveIdle();
+            it = g_leads.erase(it);
+            continue;
+        }
+
+        // Only re-issue when the bot is not already walking one of our hops, or it would
+        // re-path every tick and never get anywhere — the same mistake as re-sending a
+        // destination from outside, where `IsDuplicateMove` silently dropped it.
+        if (bot->GetMotionMaster()->GetCurrentMovementGeneratorType() == POINT_MOTION_TYPE &&
+            distance < it->second.lastDistance - 0.5f)
+        {
+            it->second.lastDistance = distance;
+            it->second.stuckFor = 0;
+            ++it;
+            continue;
+        }
+
+        if (distance >= it->second.lastDistance - 0.5f)
+        {
+            it->second.stuckFor += LEAD_INTERVAL_MS;
+
+            if (it->second.stuckFor >= LEAD_STUCK_MS)
+            {
+                LOG_INFO("module.anm", "[AnmBridge] {} gave up leading, {} yards short",
+                         bot->GetName(), static_cast<uint32>(distance));
+                bot->GetMotionMaster()->Clear();
+                bot->GetMotionMaster()->MoveIdle();
+                it = g_leads.erase(it);
+                continue;
+            }
+        }
+
+        it->second.lastDistance = distance;
+
+        PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
+
+        if (!botAI)
+        {
+            it = g_leads.erase(it);
+            continue;
+        }
+
+        // Hand the whole distance to the mod's own movement and let it find the route.
+        //
+        // Hops along the straight line between here and there were my idea, and they only work
+        // in open country. The first city broke them: standing in Stormwind, asked for a guard
+        // out in Elwynn, every 50-yard hop landed inside a wall, every one was correctly
+        // refused as unwalkable, and the companion stood still through 1631 yards of apology.
+        // The navmesh knows how to get around a building. A straight line never will.
+        //
+        // `MoveTo` does the pathfinding itself, through `SearchForBestPath`, which accepts
+        // PATHFIND_INCOMPLETE — exactly what a long route returns. So a distant destination
+        // moves the bot as far along as the mesh could work out, and asking again from where
+        // it then stands continues the journey. `normal_only` keeps it honest: it refuses
+        // rather than taking the PATHFIND_SHORTCUT that walked a companion under the world.
+        AnmMover mover(botAI);
+
+        if (!mover.MoveTo(bot->GetMapId(), it->second.x, it->second.y, it->second.z, false, false, true))
+        {
+            // Often temporary — a fight, a doorway, a few paces of drift — so it is counted
+            // rather than acted on at once. The stuck clock above does the giving up.
+            it->second.stuckFor += LEAD_INTERVAL_MS;
+        }
+
+        ++it;
+    }
+}
+
 void AnmBridge::DrainOutbox()
 {
     QueryResult result = CharacterDatabase.Query(
@@ -326,6 +489,58 @@ void AnmBridge::DrainOutbox()
             bot->SetSelection(victim->GetGUID());
             bot->Attack(victim, true);
             bot->GetMotionMaster()->MoveChase(victim);
+        }
+        else if (action == "lead")
+        {
+            // The destination arrives as "x;y;z" because the PHP side already knows exactly
+            // where the NPC stands — it reads `creature` directly — and the grid here only
+            // holds what is loaded nearby, which a destination across the zone is not.
+            float x = 0.0f, y = 0.0f, z = 0.0f;
+            if (std::sscanf(message.c_str(), "%f;%f;%f", &x, &y, &z) != 3)
+            {
+                fail("lead needs a destination as x;y;z");
+                continue;
+            }
+
+            PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot);
+            if (!botAI)
+            {
+                fail("not a playerbot");
+                continue;
+            }
+
+            // Stop the bot following, or `FollowMasterStrategy` pulls it back every tick. This
+            // is the one piece of the old chat-command route worth keeping: it was never the
+            // part that was broken.
+            botAI->ChangeStrategy("-follow,-stay,-guard", BOT_STATE_NON_COMBAT);
+            botAI->ChangeStrategy("-stay", BOT_STATE_COMBAT);
+
+            // Clearing the strategies is not enough: `stay` also records two *positions*, and
+            // `ReturnStrategy` walks a bot back to the "return" one for as long as it is set.
+            // So a player who said "wait here" before asking to be led pinned their companion
+            // to that spot, and nothing afterwards released it — he accepted every order and
+            // never moved again. `FollowChatShortcutAction` resets both, which is exactly why
+            // saying "follow me" always appeared to fix things.
+            PositionMap& posMap = botAI->GetAiObjectContext()->GetValue<PositionMap&>("position")->Get();
+
+            for (char const* which : {"stay", "return"})
+            {
+                PositionInfo spot = posMap[which];
+                spot.Reset();
+                posMap[which] = spot;
+            }
+
+            Lead lead;
+            lead.x = x;
+            lead.y = y;
+            lead.z = z;
+            lead.mapId = bot->GetMapId();
+            lead.lastDistance = bot->GetExactDist2d(x, y) + 1.0f;   // so the first pass is not "stuck"
+            g_leads[botGuid] = lead;
+        }
+        else if (action == "unlead")
+        {
+            g_leads.erase(botGuid);
         }
         else if (action == "say")
         {

@@ -40,13 +40,14 @@ final class JourneysTest extends TestCase
         return $world;
     }
 
-    public function testArrivingTellsTheCompanionToWait(): void
+    /**
+     * Arriving is only noticed here, never acted on: the module stops the companion where it
+     * gets to and forgets the destination itself, so there is nothing left to send.
+     */
+    public function testArrivingIsAnnouncedWithoutSendingAnything(): void
     {
         $world = $this->worldWithBotAt(new Position(100.0, 0.0, 50.0, 0));
-        $world->expects(self::once())
-            ->method('execute')
-            ->with('playerbots exec Menelan !position stay 100,0,50')
-            ->willReturn('ok');
+        $world->expects(self::never())->method('execute');
 
         $journeys = $this->journeys($world);
         $journeys->start(new Journey(self::BOT, new Position(103.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true)));
@@ -57,71 +58,8 @@ final class JourneysTest extends TestCase
     }
 
     /**
-     * A fresh journey anchors its first leg immediately.
-     */
-    public function testTheFirstLegIsAnchored(): void
-    {
-        $world = $this->worldWithBotAt(new Position(120.0, 0.0, 50.0, 0));
-        $world->expects(self::once())
-            ->method('execute')
-            ->with('playerbots exec Menelan !position stay 240,0,50')
-            ->willReturn('ok');
-
-        $journeys = $this->journeys($world);
-        $journeys->start(new Journey(self::BOT, new Position(400.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true)));
-
-        self::assertSame([], $journeys->tick());
-    }
-
-    /**
-     * A companion that has stopped moving has almost certainly had its anchor taken away:
-     * `PlayerbotAI::ChangeEngineOnNonCombat()` resets the stay position every time a bot leaves
-     * combat, so one wandering boar stranded a walk for good. Standing still is the only
-     * outward sign, so it is what re-anchoring keys on.
-     */
-    public function testAStalledCompanionIsAnchoredAgain(): void
-    {
-        $world = $this->worldWithBotAt(new Position(0.0, 0.0, 50.0, 0));
-        $world->expects(self::once())
-            ->method('execute')
-            ->with('playerbots exec Menelan !position stay 120,0,50')
-            ->willReturn('ok');
-
-        $journeys = $this->journeys($world);
-
-        $journey = new Journey(self::BOT, new Position(400.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true));
-        // Anchored a long time ago, and the bot has not moved an inch since.
-        $journey->anchor = new Position(120.0, 0.0, 50.0, 0);
-        $journey->wasAt = new Position(0.0, 0.0, 50.0, 0);
-        $journey->anchoredAt = microtime(true) - 30.0;
-        $journeys->start($journey);
-
-        self::assertSame([], $journeys->tick());
-    }
-
-    /**
-     * Walking normally must not re-anchor: every `position stay` is a whisper at the player,
-     * and once a second turned a stuck companion into a chatty one.
-     */
-    public function testACompanionMakingProgressIsLeftAlone(): void
-    {
-        $world = $this->worldWithBotAt(new Position(40.0, 0.0, 50.0, 0));
-        $world->expects(self::never())->method('execute');
-
-        $journeys = $this->journeys($world);
-
-        $journey = new Journey(self::BOT, new Position(400.0, 0.0, 50.0, 0), 'Deputy Willem', microtime(true));
-        $journey->anchor = new Position(120.0, 0.0, 50.0, 0);
-        $journey->wasAt = new Position(20.0, 0.0, 50.0, 0);
-        $journey->anchoredAt = microtime(true);
-        $journeys->start($journey);
-
-        self::assertSame([], $journeys->tick());
-    }
-
-    /**
-     * Still walking is not news. The anchor is re-sent, but nothing is reported to the player
-     * until the companion arrives or the walk is abandoned.
+     * Still walking is not news, and nothing is sent either — every attempt to help the walk
+     * along from out here made it worse.
      */
     public function testStillWalkingIsNotReported(): void
     {

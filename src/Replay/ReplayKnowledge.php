@@ -149,6 +149,8 @@ final class ReplayKnowledge implements GameKnowledgeInterface
                 'map' => (int) $row['map'],
                 'x' => (float) $row['x'],
                 'y' => (float) $row['y'],
+                // A snapshot records where people stood, height included when it has it.
+                'z' => (float) ($row['z'] ?? 0.0),
             ];
             ++$byName[$key]['spawns'];
         }

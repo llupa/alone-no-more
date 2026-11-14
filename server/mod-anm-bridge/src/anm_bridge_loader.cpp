@@ -100,6 +100,10 @@ public:
 
         _elapsed = 0;
         AnmBridge::DrainOutbox();
+
+        // Same cadence, deliberately: a companion leading the way re-issues a hop only when it
+        // has stopped, so twice a second is plenty and keeps LEAD_INTERVAL_MS honest.
+        AnmBridge::DriveLeads();
     }
 
 private:

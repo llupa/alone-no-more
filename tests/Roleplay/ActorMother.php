@@ -25,6 +25,7 @@ final class ActorMother
         ?Position $at = null,
         CharacterRace $race = CharacterRace::NightElf,
         CharacterClass $class = CharacterClass::Warrior,
+        int $zoneId = 141,
     ): Actor {
         return new Actor(
             guid: $guid,
@@ -34,7 +35,7 @@ final class ActorMother
             gender: Gender::Male,
             level: $level,
             position: $at ?? new Position(0, 0, 0, 1),
-            zoneId: 141,
+            zoneId: $zoneId,
             isBot: true,
             isOnline: true,
         );
@@ -45,6 +46,7 @@ final class ActorMother
         string $name = 'Doppel',
         int $level = 10,
         ?Position $at = null,
+        int $zoneId = 141,
     ): Actor {
         return new Actor(
             guid: $guid,
@@ -54,7 +56,7 @@ final class ActorMother
             gender: Gender::Male,
             level: $level,
             position: $at ?? new Position(0, 0, 0, 1),
-            zoneId: 141,
+            zoneId: $zoneId,
             isBot: false,
             isOnline: true,
         );

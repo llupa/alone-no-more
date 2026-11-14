@@ -85,7 +85,12 @@ interface GameKnowledgeInterface
      * for a pack that shares a hillside and a poor one for something spawned across a continent —
      * the spawn count tells the caller which it is dealing with.
      *
-     * @return array<int, array{name: string, level_min: int, level_max: int, spawns: int, map: int, x: float, y: float}>
+     * The height matters as much as the other two and used to be missing. Walking a companion to
+     * an NPC needs a real z: the server resolves ground height by searching fifty yards around
+     * the one it is given, so a destination handed the *bot's* height instead of the NPC's found
+     * no ground at all whenever the two stood sixty yards apart, and the walk never started.
+     *
+     * @return array<int, array{name: string, level_min: int, level_max: int, spawns: int, map: int, x: float, y: float, z: float}>
      */
     public function findCreatures(string $name, int $limit = 5): array;
 

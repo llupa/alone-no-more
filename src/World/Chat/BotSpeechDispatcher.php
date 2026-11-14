@@ -6,6 +6,7 @@ namespace App\World\Chat;
 
 use App\World\Exception\WorldGatewayException;
 use App\World\Model\ChatChannel;
+use App\World\Outbox;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
@@ -20,10 +21,15 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final readonly class BotSpeechDispatcher
 {
+    private Outbox $outbox;
+
     public function __construct(
         #[Autowire(service: 'anm.characters_connection')]
         private Connection $connection,
     ) {
+        // The queue itself is shared with anything else that has to reach into the worldserver;
+        // the constructor still takes a connection so that callers and tests are unchanged.
+        $this->outbox = new Outbox($connection);
     }
 
     /**
@@ -106,43 +112,16 @@ final readonly class BotSpeechDispatcher
      */
     public function awaitOutcome(int $outboxId, float $seconds = 2.0): array
     {
-        $deadline = microtime(true) + $seconds;
-
-        do {
-            $row = $this->connection->fetchAssociative(
-                'SELECT status, error FROM anm_outbox WHERE id = :id',
-                ['id' => $outboxId],
-            );
-
-            if (false !== $row && 'pending' !== $row['status']) {
-                return ['done' => 'done' === $row['status'], 'error' => (string) ($row['error'] ?? '')];
-            }
-
-            usleep(100_000);
-        } while (microtime(true) < $deadline);
-
-        return ['done' => false, 'error' => ''];
+        return $this->outbox->awaitOutcome($outboxId, $seconds);
     }
 
     public function statusOf(int $outboxId): ?string
     {
-        $status = $this->connection->fetchOne(
-            'SELECT status FROM anm_outbox WHERE id = :id',
-            ['id' => $outboxId],
-        );
-
-        return false === $status ? null : (string) $status;
+        return $this->outbox->statusOf($outboxId);
     }
 
     private function queue(int $botGuid, string $action, string $message, int $targetGuid): int
     {
-        $this->connection->insert('anm_outbox', [
-            'bot_guid' => $botGuid,
-            'action' => $action,
-            'target_guid' => $targetGuid,
-            'message' => $message,
-        ]);
-
-        return (int) $this->connection->lastInsertId();
+        return $this->outbox->queue($botGuid, $action, $message, $targetGuid);
     }
 }

@@ -6,6 +6,8 @@ namespace App\Roleplay\Tool;
 
 use App\Knowledge\BagsInterface;
 use App\Knowledge\Bearing;
+use App\Knowledge\Cities;
+use App\Knowledge\Dbc\ZoneBounds;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
@@ -13,6 +15,7 @@ use App\Roleplay\Errand\Errand;
 use App\Roleplay\Errand\ErrandBook;
 use App\Roleplay\Travel\Journey;
 use App\Roleplay\Travel\Journeys;
+use App\Roleplay\Travel\LeadOrders;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\Exception\WorldGatewayException;
 use App\World\Model\Position;
@@ -60,10 +63,10 @@ use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
         taken somewhere — "lead me to Deputy Willem", "take me to the quest giver", "show me
         where he is". Pass the name they used. You will stop a few paces short of them.
 
-        You can only walk them somewhere nearby. If the answer says it is too far, do not claim
-        to be setting off: tell them the direction and roughly how far, and offer to follow
-        them there instead. For telling someone where something is without walking there,
-        consult the archives instead.
+        You cannot lead anyone through a capital city — its streets and stairs are beyond you.
+        If the answer says you cannot go, do not claim to be setting off: tell them the
+        direction and roughly how far, and offer to follow them instead. For telling someone
+        where something is without walking there, consult the archives instead.
         TXT,
     method: 'leadTheWay',
 )]
@@ -154,12 +157,6 @@ final readonly class CompanionTools
     ];
 
     /**
-     * How far a companion can actually be sent, which is not a choice — it is
-     * `Playerbots.ReactDistance` minus a margin. See {@see leadTheWay()}.
-     */
-    private const LEAD_YARDS = 140.0;
-
-    /**
      * The orders that take movement over, and so end any walk in progress.
      *
      * A journey is hot memory, like an errand: it is taken in, drained a leg at a time, and
@@ -184,6 +181,8 @@ final readonly class CompanionTools
         private BotSpeechDispatcher $speech,
         private ErrandBook $errands,
         private Journeys $journeys,
+        private LeadOrders $leads,
+        private ZoneBounds $zones,
     ) {
     }
 
@@ -204,7 +203,7 @@ final readonly class CompanionTools
         $bot = $this->context->bot();
 
         if (\in_array($command, self::ORDERS_THAT_END_A_WALK, true)) {
-            $this->journeys->cancel($bot->guid);
+            $this->stopWalking($bot->guid);
         }
 
         try {
@@ -223,9 +222,8 @@ final readonly class CompanionTools
     {
         $bot = $this->context->bot();
 
-        // Chasing something is not walking somewhere. Let the walk go, or it re-anchors the
-        // companion mid-fight.
-        $this->journeys->cancel($bot->guid);
+        // Chasing something is not walking somewhere.
+        $this->stopWalking($bot->guid);
 
         // Wait for the server to actually do it. Reporting the intention instead of the outcome
         // is how a companion ended up announcing "right, going for Khizmu now" and then standing
@@ -273,77 +271,59 @@ final readonly class CompanionTools
             return \sprintf('%s is on another continent entirely. Say so; you cannot walk there.', $target['name']);
         }
 
-        [$x, $y] = self::shortOf($bot->position->x, $bot->position->y, (float) $target['x'], (float) $target['y']);
-
-        $bearing = Bearing::from($bot->position, new Position((float) $target['x'], (float) $target['y'], 0.0, $target['map']));
-        $away = hypot($x - $bot->position->x, $y - $bot->position->y);
-
-        // Past this, a companion cannot be walked anywhere, and the honest answer is to say so.
+        // Cities are not walkable this way, and saying so is the whole feature here.
         //
-        // `Playerbots.ReactDistance` (150 yards as shipped) is a hard leash on every "go there"
-        // mechanism the mod has: `ReturnToStayPositionAction::isPossible()` throws away a stay
-        // anchor beyond it, and `GoAction`'s coordinate form refuses outright with "It is too
-        // far away". Six rewrites went into trying to get past that, and the logs were
-        // unambiguous in the end — under the leash a companion arrives every time, over it the
-        // distance never changes by a single yard.
-        //
-        // Claiming to be walking and then standing still is worse than refusing. Directions a
-        // player can act on are worth more than a promise that is not kept.
-        if ($away > self::LEAD_YARDS) {
+        // The server's navigation handles open country well and a capital badly: doors, lifts,
+        // stacked floors, and a mesh that must be followed exactly. Asked inside Stormwind for
+        // a guard out in Elwynn, a companion stood still through sixteen hundred yards of
+        // apology, because every way out of the city ran through a wall. A player in a capital
+        // has signposts and a flight master; what they lack is a companion who promises a walk
+        // and does not move.
+        $here = Cities::name($bot->zoneId);
+        $there = Cities::name($this->zones->areaAt($target['map'], (float) $target['x'], (float) $target['y']));
+        $city = $here ?? $there;
+
+        if (null !== $city) {
             return \sprintf(
-                '%s is too far for you to walk them to — %s. Say so plainly, give them the '
-                .'direction and roughly how far, and offer to follow them there instead.',
+                'You cannot lead anyone through %s — the streets and stairs are beyond you. Say '
+                .'so plainly, tell them roughly where %s is, and offer to follow them instead.',
+                $city,
                 $target['name'],
-                null !== $bearing ? $bearing->describe() : \sprintf('about %d paces off', (int) round($away)),
             );
         }
 
-        $journey = new Journey(
-            botGuid: $bot->guid,
-            destination: new Position($x, $y, $bot->position->z, $bot->position->mapId),
-            towards: $target['name'],
-            startedAt: microtime(true),
+        [$x, $y] = self::shortOf($bot->position->x, $bot->position->y, (float) $target['x'], (float) $target['y']);
+
+        // Handed to mod-anm-bridge rather than driven from out here.
+        //
+        // Six attempts went into doing this with the mod's own chat commands, and all six died
+        // at the same 150 yards — `Playerbots.ReactDistance`, which leashes every route in
+        // rather than being a mechanism any of them used wrongly. See {@see LeadOrders}.
+        // Inside the worldserver there is no leash, nothing is whispered at the player on
+        // every re-anchor, and a fight on the way is a pause rather than the end of the walk.
+        // The NPC's own height, not the companion's. The server resolves ground height by
+        // searching fifty yards around whatever z it is handed, so passing the bot's height
+        // found no ground whenever the two stood further apart than that vertically — and the
+        // walk was refused, correctly and permanently, with the companion stood still.
+        $refused = $this->leads->walkTo(
+            $bot->guid,
+            new Position($x, $y, (float) $target['z'], $bot->position->mapId),
         );
 
-        // The first leg, which {@see Journeys} then drags along the route.
-        $leg = $journey->nextLeg($bot->position);
-
-        try {
-            // Five attempts at this failed by trying to out-issue the bot's own AI with
-            // one-shot orders. The logs finally showed why, and the fix is to stop competing
-            // with the engine and drive it instead.
-            //
-            // The real limit was never the mechanism, it was the range. Every one of those
-            // rewrites would have worked at a hundred yards and frozen at three hundred:
-            // `ReturnToStayPositionAction::isPossible()` discards any anchor further off than
-            // `Playerbots.ReactDistance` (150 yards as shipped) and re-anchors the bot where
-            // it stands, and `GoAction`'s coordinate form refuses the same distance outright
-            // with "It is too far away". The companion's own estimates were the giveaway:
-            // "about a hundred paces" always arrived, "about 303 paces east" never did.
-            //
-            // So the walk is handed to `StayStrategy`, whose "return to stay position" trigger
-            // runs every tick and holds the bot when it arrives — and {@see Journeys} drags
-            // that anchor along the route a leg at a time, so it is never out of range.
-            //
-            // Two things are deliberately not used. `go travel <npc>` whispers "Clearing
-            // travel target" and returns *success* when the travel system does not recognise
-            // the name, which it does not for most NPCs, so nothing ever threw and no fallback
-            // ran. Repeated `go x;y;z` orders are rejected by `IsDuplicateMove` when they name
-            // the same point, so the nudges that looked like effort were no-ops.
-            //
-            // `follow` first, because it is the mod's own full reset: `-stay` on both engines
-            // and both recorded positions cleared. Then stop following, then move the anchor,
-            // then switch the strategy on. `position stay` is used rather than the `stay`
-            // command, which would overwrite the anchor with where the bot is standing now.
-            $this->runner->run($bot->name, 'follow');
-            $this->runner->run($bot->name, 'nc -follow');
-            $this->runner->anchorAt($bot->name, $leg->x, $leg->y, $leg->z);
-            $this->runner->run($bot->name, 'nc +stay');
-        } catch (WorldGatewayException $e) {
-            return 'You could not set off: '.$e->getMessage();
+        if ('' !== $refused) {
+            return \sprintf('You could not set off: %s.', $refused);
         }
 
-        $this->journeys->start($journey);
+        // Still watched from here: arrival is the companion's line to say, and the listener
+        // already refreshes every position on each pass.
+        $this->journeys->start(new Journey(
+            botGuid: $bot->guid,
+            destination: new Position($x, $y, (float) $target['z'], $bot->position->mapId),
+            towards: $target['name'],
+            startedAt: microtime(true),
+        ));
+
+        $bearing = Bearing::from($bot->position, new Position((float) $target['x'], (float) $target['y'], 0.0, $target['map']));
 
         return \sprintf(
             'You are walking to %s%s, and will wait there. Tell them to follow you.',
@@ -384,7 +364,7 @@ final readonly class CompanionTools
         $owner = $forPlayer ? $this->context->speaker() : $bot;
 
         // An errand owns the companion's feet for as long as it runs, so any walk ends here.
-        $this->journeys->cancel($bot->guid);
+        $this->stopWalking($bot->guid);
 
         // The mod's own `grind` strategy would do something similar and wander off doing it:
         // it finds its own targets, anywhere. An errand keeps the companion on what the player
@@ -417,11 +397,22 @@ final readonly class CompanionTools
             : \sprintf('You are working through them and will stop when "%s" is done.', $questTitle);
     }
 
+    /**
+     * End a walk, both halves of it: the module doing the walking and the watcher waiting to
+     * announce the arrival. Forgetting either leaves a companion that keeps walking after
+     * being told to stop, or one that announces arriving somewhere it was never sent.
+     */
+    private function stopWalking(int $botGuid): void
+    {
+        $this->journeys->cancel($botGuid);
+        $this->leads->stop($botGuid);
+    }
+
     public function stopFighting(): string
     {
         $bot = $this->context->bot();
         $this->errands->finish($bot->guid);
-        $this->journeys->cancel($bot->guid);
+        $this->stopWalking($bot->guid);
 
         try {
             $this->runner->run($bot->name, 'follow');
