@@ -1,0 +1,99 @@
+# Two platforms, always configured; which one answers is chosen at runtime by ANM_AI_PROVIDER.
+# Ollama is the default so the project runs from a clean clone with no key and no account —
+# which is also what lets a juror try it.
+ai:
+    platform:
+        ollama:
+            endpoint: '%env(OLLAMA_ENDPOINT)%'
+        anthropic:
+            api_key: '%env(ANTHROPIC_API_KEY)%'
+
+    agent:
+        # The archivist. Its whole job is reading the server's own tables — quest rows, item
+        # rows, loot tables — and boiling them down to a sentence or two. That is a lot of input
+        # tokens for very little output, which is exactly the shape a cheap model is for. The
+        # expensive model never sees a raw database row.
+        lore:
+            platform: 'ai.platform.anthropic'
+            model: '%env(ANM_LORE_MODEL)%'
+            prompt:
+                text: |
+                    You are the keeper of the world's records. You answer questions about quests,
+                    items, creatures and where things are found, using only the tools given to
+                    you.
+
+                    Answer in one or two plain sentences, as a knowledgeable person would in
+                    conversation — never as a list, a table or a database row. Give numbers only
+                    when they matter: a drop rate, a level, how many are needed.
+
+                    If the tools do not find something, say so plainly. Never guess a name, a
+                    location or a drop rate. A confident wrong answer is worse than "I don't
+                    know", because the person asking cannot tell the difference until they have
+                    walked there.
+            tools:
+                enabled: true
+                services:
+                    - service: 'App\Knowledge\Tool\ArchiveTools'
+
+        # Ambient muttering. One throwaway line, no tools, no memory, nothing to carry — which
+        # is exactly what the cheap model is for. It runs unattended across a crowd, so the
+        # difference between Haiku and Sonnet here is the difference between a feature and a
+        # bill.
+        banter_anthropic:
+            platform: 'ai.platform.anthropic'
+            model: '%env(ANM_LORE_MODEL)%'
+            prompt:
+                text: |
+                    You give a single line of idle chatter for a World of Warcraft character,
+                    overheard by whoever is standing nearby.
+
+                    Answer with the line and nothing else: no quotation marks, no name, no
+                    narration, no asterisks, no explanation. One sentence, under twenty words.
+                    Speak as the character, never about them.
+            tools: false
+
+        # The same, locally. Banter runs unattended on whatever provider is configured, so
+        # pinning it to Anthropic would throw on every tick for anyone running from a clean
+        # clone — which is most of the ways this project gets tried.
+        banter_ollama:
+            platform: 'ai.platform.ollama'
+            model: '%env(ANM_OLLAMA_MODEL)%'
+            prompt:
+                text: |
+                    You give a single line of idle chatter for a World of Warcraft character,
+                    overheard by whoever is standing nearby.
+
+                    Answer with the line and nothing else: no quotation marks, no name, no
+                    narration, no asterisks, no explanation. One sentence, under twenty words.
+                    Speak as the character, never about them.
+            tools: false
+
+        # The performer. Stays in character, answers briefly, and asks the archivist when a
+        # question needs looking up.
+        roleplay_anthropic:
+            memory: { service: 'App\Roleplay\Memory\SceneMemoryProvider' }
+            platform: 'ai.platform.anthropic'
+            model: '%env(ANM_ANTHROPIC_MODEL)%'
+            tools:
+                enabled: true
+                services:
+                    - service: 'App\Roleplay\Tool\CompanionTools'
+                    - agent: 'lore'
+                      name: 'consult_the_archives'
+                      description: >-
+                          Ask someone who knows the world's records about a quest, an item, a
+                          creature, a person, or where any of them can be found. Use it whenever
+                          the player asks something you were not told in your instructions —
+                          especially "where is", "who is", "where do I get", "what do I need
+                          for", "where do I hand this in". Always ask before answering that you
+                          do not know: they can give directions and distances from where you are
+                          standing. Ask in plain words, as you would ask a person.
+
+        # The local model. Tools are OFF: llama3.1:8b does not reliably use the tool-calling
+        # protocol — in testing it emitted a call as plain chat text and invented the tool name
+        # while doing it. Without tools it holds a conversation well; with them it degrades.
+        roleplay_ollama:
+            memory: { service: 'App\Roleplay\Memory\SceneMemoryProvider' }
+            platform: 'ai.platform.ollama'
+            model: '%env(ANM_OLLAMA_MODEL)%'
+            tools: false
