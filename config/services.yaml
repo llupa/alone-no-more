@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=../vendor/symfony/dependency-injection/Loader/schema/services.schema.json
+
+# This file is the entry point to configure your own services.
+# Files in the packages/ subdirectory configure your dependencies.
+# See also https://symfony.com/doc/current/service_container/import.html
+
+# Put parameters here that don't need to change on each machine where the app is deployed
+# https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
+parameters:
+
+services:
+    # default configuration for services in *this* file
+    _defaults:
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
+
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
+    App\:
+        resource: '../src/'
+
+    # add more service definitions when explicit configuration is needed
+    # please note that last definitions always *replace* previous ones
+
+# Replay: the whole app, running against a captured world instead of a live server.
+#
+# Nothing downstream knows. Every swap below is an interface the real implementation also
+# satisfies, which is what makes this worth having rather than a parallel demo codebase that
+# drifts out of step with the real one.
+when@replay:
+    services:
+        _defaults:
+            autowire: true
+            autoconfigure: true
+
+        App\:
+            resource: '../src/'
+
+        # These override the #[AsAlias] on the real implementations. The real services stay
+        # registered but unused, and Symfony removes them — nothing opens a connection, so a
+        # clone with no MySQL and no server runs the whole application unchanged.
+        App\World\WorldGatewayInterface: '@App\Replay\ReplayGateway'
+        App\World\GroupRepositoryInterface: '@App\Replay\ReplayGroupRepository'
+        App\World\Chat\ChatEventRepositoryInterface: '@App\Replay\ReplayChatEvents'
+        App\Knowledge\GameKnowledgeInterface: '@App\Replay\ReplayKnowledge'
+        App\Knowledge\QuestLogInterface: '@App\Replay\ReplayQuestLog'
+        App\Herding\BotStagerInterface: '@App\Replay\ReplayStager'
