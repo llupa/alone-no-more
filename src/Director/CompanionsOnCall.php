@@ -21,6 +21,12 @@ use Psr\Log\NullLogger;
  */
 final readonly class CompanionsOnCall implements ProtectedBots
 {
+    /**
+     * How far a booked companion may stray before being brought back. Well beyond the herder's
+     * own staging radius, so the two do not fight over the same bot.
+     */
+    private const STILL_HERE_YARDS = 400.0;
+
     public function __construct(
         private CompanionRequests $requests,
         private WorldGatewayInterface $world,
@@ -33,17 +39,39 @@ final readonly class CompanionsOnCall implements ProtectedBots
     /**
      * Bring anyone waiting for this player into the world beside them.
      *
+     * @param int[] $busy guids to leave alone whatever their distance — a companion walking
+     *                    somewhere on purpose is not one who has wandered off
+     *
      * @return string[] names newly brought in, for the listener to report
      */
-    public function gather(Actor $player): array
+    public function gather(Actor $player, array $busy = []): array
     {
         $arrived = [];
 
         foreach ($this->requests->forCharacter($player->guid) as $request) {
+            if (\in_array($request['bot_guid'], $busy, true)) {
+                continue;
+            }
+
             $bot = $this->world->findActorByGuid($request['bot_guid']);
 
-            if (null !== $bot && $bot->isOnline) {
+            if (null !== $bot && $bot->isOnline && $this->isWithReach($bot, $player)) {
                 continue;
+            }
+
+            // Online but somewhere else entirely. A booked companion is not a bot in a crowd:
+            // the mod's own random-bot manager will happily walk them into the next zone while
+            // the player is logged out, and asking for someone in advance is pointless if they
+            // then have to be found. Sending them away first is what lets them be placed again
+            // — a bot already in the world cannot be moved by staging it.
+            if (null !== $bot && $bot->isOnline) {
+                $this->logger->info('Recalling {name} to {player} from {zone}', [
+                    'name' => $request['bot_name'],
+                    'player' => $player->name,
+                    'zone' => $bot->zoneId,
+                ]);
+
+                $this->speech->logout($request['bot_guid']);
             }
 
             // Placed before logging in, exactly as the herder does it — a bot that logs in where
@@ -62,6 +90,20 @@ final readonly class CompanionsOnCall implements ProtectedBots
         }
 
         return $arrived;
+    }
+
+    /**
+     * Whether a companion is near enough to count as already gathered.
+     *
+     * Generous on purpose: this is "are they here with the player", not "are they in formation".
+     * A companion a little way off is walking back; one in the next zone has been taken by the
+     * random-bot manager and is not coming back on their own.
+     */
+    private function isWithReach(Actor $bot, Actor $player): bool
+    {
+        return $bot->zoneId === $player->zoneId
+            && $bot->position->mapId === $player->position->mapId
+            && $bot->isWithin(self::STILL_HERE_YARDS, $player);
     }
 
     /**

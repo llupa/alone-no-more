@@ -215,7 +215,7 @@ final class ListenCommand
         foreach ($players as $player) {
             // Anyone asked for in advance arrives first, so they are in the world before the
             // crowd is sized around it.
-            foreach ($this->onCall->gather($player) as $name) {
+            foreach ($this->onCall->gather($player, $this->journeys->walkingGuids()) as $name) {
                 $io->writeln(\sprintf('<fg=cyan>~ %s was waiting for %s and is here</>', $name, $player->name));
             }
 
