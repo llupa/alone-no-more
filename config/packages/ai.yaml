@@ -78,16 +78,10 @@ ai:
                 enabled: true
                 services:
                     - service: 'App\Roleplay\Tool\CompanionTools'
-                    - agent: 'lore'
-                      name: 'consult_the_archives'
-                      description: >-
-                          Ask someone who knows the world's records about a quest, an item, a
-                          creature, a person, or where any of them can be found. Use it whenever
-                          the player asks something you were not told in your instructions —
-                          especially "where is", "who is", "where do I get", "what do I need
-                          for", "where do I hand this in". Always ask before answering that you
-                          do not know: they can give directions and distances from where you are
-                          standing. Ask in plain words, as you would ask a person.
+                    # Not `agent: 'lore'`: that wires Symfony AI's Subagent tool, which
+                    # asserts the result is a TextResult and therefore throws on every lookup
+                    # once thinking is on. See App\Roleplay\Tool\ArchivistTool.
+                    - service: 'App\Roleplay\Tool\ArchivistTool'
 
         # The local model. Tools are OFF: llama3.1:8b does not reliably use the tool-calling
         # protocol — in testing it emitted a call as plain chat text and invented the tool name
