@@ -1,0 +1,29 @@
+
+###> symfony/framework-bundle ###
+/.env.local
+/.env.local.php
+/.env.*.local
+/config/secrets/prod/prod.decrypt.private.php
+/public/bundles/
+/var/
+/vendor/
+###< symfony/framework-bundle ###
+
+###> phpunit/phpunit ###
+/phpunit.xml
+/.phpunit.cache/
+###< phpunit/phpunit ###
+
+###> friendsofphp/php-cs-fixer ###
+/.php-cs-fixer.php
+/.php-cs-fixer.cache
+###< friendsofphp/php-cs-fixer ###
+
+###> alone-no-more ###
+# AzerothCore writes its logs into the working directory it is started from.
+# They are a running server's output, not part of the project.
+/Auth.log
+/Errors.log
+/Playerbots.log
+/Server.log
+###< alone-no-more ###
