@@ -1,0 +1,12 @@
+# Connections to AzerothCore's own databases. Read directly rather than modelled with the ORM:
+# the schema belongs to the server and changes with the core, not with us.
+services:
+    anm.characters_connection:
+        class: Doctrine\DBAL\Connection
+        factory: ['App\World\ConnectionFactory', 'create']
+        arguments: ['%env(ANM_CHARACTERS_DSN)%']
+
+    anm.world_connection:
+        class: Doctrine\DBAL\Connection
+        factory: ['App\World\ConnectionFactory', 'create']
+        arguments: ['%env(ANM_WORLD_DSN)%']
