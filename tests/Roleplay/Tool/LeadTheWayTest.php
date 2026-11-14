@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Roleplay\Tool;
 
 use App\Knowledge\GameKnowledgeInterface;
+use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
 use App\Roleplay\Errand\ErrandBook;
 use App\Roleplay\Tool\BotCommandContext;
@@ -95,6 +96,7 @@ final class LeadTheWayTest extends TestCase
             new PlayerbotCommandRunner($world),
             $this->createStub(QuestLogInterface::class),
             $knowledge,
+            $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
             new Journeys($world, new PlayerbotCommandRunner($world)),

@@ -44,4 +44,5 @@ when@replay:
         App\World\Chat\ChatEventRepositoryInterface: '@App\Replay\ReplayChatEvents'
         App\Knowledge\GameKnowledgeInterface: '@App\Replay\ReplayKnowledge'
         App\Knowledge\QuestLogInterface: '@App\Replay\ReplayQuestLog'
+        App\Knowledge\LevelProgressInterface: '@App\Replay\ReplayLevelProgress'
         App\Herding\BotStagerInterface: '@App\Replay\ReplayStager'

@@ -6,6 +6,7 @@ namespace App\Roleplay\Tool;
 
 use App\Knowledge\Bearing;
 use App\Knowledge\GameKnowledgeInterface;
+use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
 use App\Roleplay\Errand\Errand;
 use App\Roleplay\Errand\ErrandBook;
@@ -78,6 +79,15 @@ use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
     method: 'stopFighting',
 )]
 #[AsTool(
+    name: 'check_experience',
+    description: <<<'TXT'
+        How far you or the player are through your current level. Use for "how much more xp do
+        you need", "how close are you to levelling", "am I nearly there". Pass whose: "mine" for
+        your own, "theirs" for the player's.
+        TXT,
+    method: 'checkExperience',
+)]
+#[AsTool(
     name: 'check_my_quest_log',
     description: 'Read your own quest log. Use whenever the player asks what you are working on, what quests you have, whether you have finished one, or whether you share one with them — you cannot know this otherwise.',
     method: 'checkMyQuestLog',
@@ -126,6 +136,7 @@ final readonly class CompanionTools
         private PlayerbotCommandRunner $runner,
         private QuestLogInterface $questLog,
         private GameKnowledgeInterface $knowledge,
+        private LevelProgressInterface $levels,
         private BotSpeechDispatcher $speech,
         private ErrandBook $errands,
         private Journeys $journeys,
@@ -344,6 +355,32 @@ final readonly class CompanionTools
         }
 
         return [null, null];
+    }
+
+    /**
+     * @param string $whose "mine" for the companion's own, "theirs" for the player's
+     */
+    public function checkExperience(string $whose = 'mine'): string
+    {
+        $theirs = str_starts_with(strtolower(trim($whose)), 't');
+        $who = $theirs ? $this->context->speaker() : $this->context->bot();
+        $progress = $this->levels->forCharacter($who->guid);
+
+        if (null === $progress) {
+            return $theirs
+                ? \sprintf('You cannot tell how far along %s is.', $who->name)
+                : 'You cannot tell how far along you are.';
+        }
+
+        // Rounded, and never the raw number alone. "2,084 more" is a database row read aloud;
+        // "about three quarters of the way" is what one traveller tells another.
+        return \sprintf(
+            '%s level %d, about %d%% of the way to the next, with %s experience still to earn.',
+            $theirs ? $who->name.' is' : 'You are',
+            $progress['level'],
+            $progress['percent'],
+            number_format($progress['remaining']),
+        );
     }
 
     public function checkMyQuestLog(): string

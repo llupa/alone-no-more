@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Tests\Roleplay\Tool;
 
 use App\Knowledge\GameKnowledgeInterface;
+use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
 use App\Roleplay\Errand\ErrandBook;
 use App\Roleplay\Tool\BotCommandContext;
@@ -120,6 +121,7 @@ final class CompanionQuestLogTest extends TestCase
             $runner,
             $log,
             $knowledge,
+            $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
             new Journeys($this->createStub(WorldGatewayInterface::class), $runner),
