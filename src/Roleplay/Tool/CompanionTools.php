@@ -211,6 +211,13 @@ final readonly class CompanionTools
         [$x, $y] = self::shortOf($bot->position->x, $bot->position->y, (float) $target['x'], (float) $target['y']);
 
         try {
+            // Drop the follow strategy first, or it wins. `go` issues one movement order while
+            // FollowMasterStrategy runs every tick, so a companion told to lead walked about
+            // fifteen paces and came straight back. Removing it rather than using `stay`:
+            // the movement strategies are siblings, so `stay` would not free the bot, it would
+            // anchor it somewhere new and fight the walk from there instead.
+            $this->runner->run($bot->name, 'nc -follow');
+
             // Z is left as the bot's own: the server pathfinds, and guessing a height from a
             // spawn average is how you send someone into the ground.
             $this->runner->goTo($bot->name, $x, $y, $bot->position->z);

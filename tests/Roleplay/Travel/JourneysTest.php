@@ -66,12 +66,17 @@ final class JourneysTest extends TestCase
     }
 
     /**
-     * A walk that never finishes must not leave a companion marked as travelling for ever.
+     * A walk that never finishes must not leave a companion marked as travelling for ever —
+     * nor standing in a field. Following was switched off to let them walk, so giving up has to
+     * switch it back on.
      */
-    public function testAWalkThatNeverFinishesIsGivenUpOn(): void
+    public function testGivingUpPutsTheCompanionBackToFollowing(): void
     {
         $world = $this->worldWithBotAt(new Position(0.0, 0.0, 50.0, 0));
-        $world->expects(self::never())->method('execute');
+        $world->expects(self::once())
+            ->method('execute')
+            ->with('playerbots exec Menelan !follow')
+            ->willReturn('ok');
 
         $journeys = $this->journeys($world);
         $journeys->start(new Journey(

@@ -43,6 +43,25 @@ final class Journeys
     }
 
     /**
+     * Say something to a bot, and shrug if it does not land.
+     *
+     * Nothing here is worth interrupting the listener for: a companion that fails to hold
+     * position is a smaller problem than a loop that stops running.
+     */
+    private function tell(string $botName, string $command): void
+    {
+        try {
+            $this->runner->run($botName, $command);
+        } catch (WorldGatewayException $e) {
+            $this->logger->warning('{bot} did not take "{command}": {why}', [
+                'bot' => $botName,
+                'command' => $command,
+                'why' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
      * @return array<int, string> bot guid => what to report, for arrivals and for giving up
      */
     public function tick(): array
@@ -63,13 +82,10 @@ final class Journeys
                 unset($this->walking[$guid]);
                 $news[$guid] = \sprintf('%s reached %s and is waiting there', $bot->name, $journey->towards);
 
-                // Hold position, or the follow strategy walks them straight back. `follow` puts
-                // them right again whenever the player asks, which the mod does well.
-                try {
-                    $this->runner->run($bot->name, 'stay');
-                } catch (WorldGatewayException $e) {
-                    $this->logger->warning('Could not hold {bot} in place: {why}', ['bot' => $bot->name, 'why' => $e->getMessage()]);
-                }
+                // Hold position. Following is already off — it was switched off to let them
+                // walk — so this is belt and braces, and it is what the player asked for: wait
+                // here. `follow` puts them right again whenever they say so.
+                $this->tell($bot->name, 'stay');
 
                 continue;
             }
@@ -77,6 +93,10 @@ final class Journeys
             if ($journey->gaveUp($now)) {
                 unset($this->walking[$guid]);
                 $news[$guid] = \sprintf('%s could not reach %s', $bot->name, $journey->towards);
+
+                // Following was switched off to let them walk. A failed journey must not leave
+                // a companion standing in a field for the rest of the evening.
+                $this->tell($bot->name, 'follow');
 
                 continue;
             }
