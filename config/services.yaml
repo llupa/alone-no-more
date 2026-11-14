@@ -45,4 +45,5 @@ when@replay:
         App\Knowledge\GameKnowledgeInterface: '@App\Replay\ReplayKnowledge'
         App\Knowledge\QuestLogInterface: '@App\Replay\ReplayQuestLog'
         App\Knowledge\LevelProgressInterface: '@App\Replay\ReplayLevelProgress'
+        App\Knowledge\BagsInterface: '@App\Replay\ReplayBags'
         App\Herding\BotStagerInterface: '@App\Replay\ReplayStager'

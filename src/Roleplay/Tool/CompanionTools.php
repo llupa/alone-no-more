@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Roleplay\Tool;
 
+use App\Knowledge\BagsInterface;
 use App\Knowledge\Bearing;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
@@ -139,16 +140,20 @@ final readonly class CompanionTools
         'follow', 'stay', 'attack', 'flee', 'runaway', 'grind', 'revive', 'release', 'repair',
         'buff', 'rebuff', 'ready', 'pull', 'disperse', 'leave', 'invite', 'taxi', 'home',
         'drink', 'mount', 'dismount',
-        // Gear, added after a companion had to refuse a reasonable request. Both take no
-        // arguments and touch only the bot's own bags, which is why they can sit in the bare
-        // verb list while equipping a *named* item needs its own tool.
-        'equip upgrade', 'autogear',
+        // Gear, added after a companion had to refuse a reasonable request. It takes no
+        // arguments and only re-equips what the bot already carries (EquipUpgradeAction is
+        // SelectInventoryItemsToEquip + EquipItems), which is why it can sit in the bare verb
+        // list while equipping a *named* item needs its own tool. Deliberately *not* here:
+        // `autogear`, which runs PlayerbotFactory::InitEquipment and conjures fresh items into
+        // the bot's slots. That is a gearing cheat, not a request a companion should honour.
+        'equip upgrade',
     ];
 
     public function __construct(
         private BotCommandContext $context,
         private PlayerbotCommandRunner $runner,
         private QuestLogInterface $questLog,
+        private BagsInterface $bags,
         private GameKnowledgeInterface $knowledge,
         private LevelProgressInterface $levels,
         private BotSpeechDispatcher $speech,
@@ -386,17 +391,32 @@ final readonly class CompanionTools
     {
         $item = trim($item);
 
-        // Item names, not commands. The mod's `e` takes a name or a link and acts only on the
-        // bot's own inventory, so the risk here is low — but the string still reaches a GM
-        // console, and a name is a short line of ordinary words.
+        // A name is a short line of ordinary words. This no longer guards the console — the
+        // command is built from an integer below — but it keeps a search string out of a LIKE.
         if (1 !== preg_match("/^[A-Za-z0-9 '\\-]{2,40}$/", $item)) {
             return \sprintf('"%s" is not the name of a thing you could be wearing.', $item);
         }
 
-        try {
-            $this->runner->run($this->context->bot()->name, 'e '.$item);
+        $bot = $this->context->bot();
 
-            return \sprintf('You have put on the %s, if it was in your bags.', $item);
+        // The name has to become an entry id before anything can be sent: the mod's `equip`
+        // understands item links and nothing else. Looking it up in this bot's own bags buys
+        // the honest refusal below as well — previously every request was answered "you have
+        // put it on, if it was in your bags", whether or not it was, and it never was.
+        $found = $this->bags->wearableNamed($bot->guid, $item);
+
+        if (null === $found) {
+            return \sprintf(
+                'You are not carrying anything called "%s" that you could wear. Say so, and ask '
+                .'them to hand it over if they are still holding it.',
+                $item,
+            );
+        }
+
+        try {
+            $this->runner->equipItem($bot->name, $found['entry']);
+
+            return \sprintf('You have put on your %s.', $found['name']);
         } catch (WorldGatewayException $e) {
             return 'You could not: '.$e->getMessage();
         }

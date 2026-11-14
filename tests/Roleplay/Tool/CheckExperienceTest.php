@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Roleplay\Tool;
 
+use App\Knowledge\BagsInterface;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
@@ -81,6 +82,7 @@ final class CheckExperienceTest extends TestCase
             $context,
             $runner,
             $this->createStub(QuestLogInterface::class),
+            $this->createStub(BagsInterface::class),
             $this->createStub(GameKnowledgeInterface::class),
             $levels,
             new BotSpeechDispatcher($this->createStub(Connection::class)),

@@ -111,6 +111,39 @@ final readonly class PlayerbotCommandRunner
     }
 
     /**
+     * Have a bot put on one specific item out of its own bags.
+     *
+     * This is its own method for the same reason as {@see goTo()}: the command cannot be
+     * expressed in the characters {@see COMMAND} allows. `EquipAction` parses its argument with
+     * `ChatHelper::parseItems`, which scans for the substring `Hitem:` and has no name matching
+     * at all — so a plain name is parsed to an empty set and the bot silently does nothing,
+     * which is exactly how this looked when it was broken. It needs a real item link.
+     *
+     * A link is full of the punctuation a console argument should never contain, so none of it
+     * comes from the model: the caller supplies an entry id it looked up in the bot's own
+     * inventory, and the link is formatted from that integer here. The trailing `[name]` is the
+     * part a human reads; the client never sees it, so it is deliberately not the name the model
+     * typed.
+     *
+     * @param int $itemEntry an `item_template` id, which the caller must already have found in
+     *                       this bot's bags
+     *
+     * @throws WorldGatewayException when the name is malformed or the server refuses
+     */
+    public function equipItem(string $botName, int $itemEntry): string
+    {
+        if (1 !== preg_match(self::NAME, $botName)) {
+            throw new WorldGatewayException(\sprintf('"%s" is not a character name.', $botName));
+        }
+
+        if ($itemEntry < 1) {
+            throw new WorldGatewayException(\sprintf('%d is not an item.', $itemEntry));
+        }
+
+        return $this->send($botName, \sprintf('e |Hitem:%d:0:0:0:0:0:0:0:0|h[item]|h|r', $itemEntry));
+    }
+
+    /**
      * @return string the server's acknowledgement, e.g. `Nytalleath: 'follow' sent`
      *
      * @throws WorldGatewayException when the name or command is malformed, the bot is offline,

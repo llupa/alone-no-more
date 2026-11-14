@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Roleplay\Tool;
 
+use App\Knowledge\BagsInterface;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
@@ -52,7 +53,6 @@ final class CompanionActionsTest extends TestCase
         yield 'dismount' => ['dismount'];
         // Gear, added after a companion had to refuse a reasonable request.
         yield 'equip upgrade' => ['equip upgrade'];
-        yield 'autogear' => ['autogear'];
     }
 
     /**
@@ -77,20 +77,51 @@ final class CompanionActionsTest extends TestCase
         yield 'mails them away' => ['sendmail'];
         yield 'kicks a guild member' => ['guild remove'];
         yield 'drops something' => ['drop'];
+        yield 'conjures fresh gear' => ['autogear'];
+        yield 'conjures best-in-slot gear' => ['autogear bis'];
         yield 'invented entirely' => ['perform a heroic charge'];
     }
 
+    /**
+     * The mod's `equip` parses item links and nothing else — `ChatHelper::parseItems` looks for
+     * the substring `Hitem:` and has no name matching at all. Sending the name the player said
+     * parsed to an empty set, so the bot did nothing and the tool still reported success. The
+     * name therefore has to be resolved to an entry id and sent as a link.
+     */
     public function testItWearsSomethingByName(): void
     {
+        $bags = $this->createMock(BagsInterface::class);
+        $bags->method('wearableNamed')
+            ->with(1, "Journeyman's Pants")
+            ->willReturn(['entry' => 7281, 'name' => "Journeyman's Pants", 'quality' => 2, 'item_level' => 25]);
+
         $world = $this->createMock(WorldGatewayInterface::class);
         $world->expects(self::once())
             ->method('execute')
-            ->with("playerbots exec Menelan !e Journeyman's Pants")
+            ->with('playerbots exec Menelan !e |Hitem:7281:0:0:0:0:0:0:0:0|h[item]|h|r')
             ->willReturn('ok');
 
         self::assertStringContainsString(
             "Journeyman's Pants",
-            $this->tools($world)->wearThis("Journeyman's Pants"),
+            $this->tools($world, $bags)->wearThis("Journeyman's Pants"),
+        );
+    }
+
+    /**
+     * The old wording was "You have put on the %s, if it was in your bags" for every request,
+     * true or not. A companion that cannot find the thing should say so.
+     */
+    public function testItSaysSoWhenItIsNotCarryingTheThing(): void
+    {
+        $bags = $this->createMock(BagsInterface::class);
+        $bags->method('wearableNamed')->willReturn(null);
+
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->expects(self::never())->method('execute');
+
+        self::assertStringContainsString(
+            'not carrying',
+            $this->tools($world, $bags)->wearThis('Thunderfury'),
         );
     }
 
@@ -120,7 +151,7 @@ final class CompanionActionsTest extends TestCase
         self::assertStringContainsString('do not know how', $this->tools($world)->doThis('follow; destroy'));
     }
 
-    private function tools(WorldGatewayInterface $world): CompanionTools
+    private function tools(WorldGatewayInterface $world, ?BagsInterface $bags = null): CompanionTools
     {
         $context = new BotCommandContext();
         $context->enter(ActorMother::bot(1, 'Menelan'), ActorMother::player(100), null);
@@ -131,6 +162,7 @@ final class CompanionActionsTest extends TestCase
             $context,
             $runner,
             $this->createStub(QuestLogInterface::class),
+            $bags ?? $this->createStub(BagsInterface::class),
             $this->createStub(GameKnowledgeInterface::class),
             $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),

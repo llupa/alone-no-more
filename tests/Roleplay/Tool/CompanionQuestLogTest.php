@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Tests\Roleplay\Tool;
 
+use App\Knowledge\BagsInterface;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
 use App\Knowledge\QuestLogInterface;
@@ -120,6 +121,7 @@ final class CompanionQuestLogTest extends TestCase
             $context,
             $runner,
             $log,
+            $this->createStub(BagsInterface::class),
             $knowledge,
             $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),

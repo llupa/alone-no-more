@@ -93,4 +93,31 @@ final class PlayerbotCommandRunnerTest extends TestCase
 
         (new PlayerbotCommandRunner($world))->run('Menelan', 'co +dps');
     }
+
+    /**
+     * An item link is full of punctuation {@see PlayerbotCommandRunner::run()} refuses, which is
+     * why equipping has its own method: the link is formatted from an integer, so none of that
+     * punctuation can have come from a model. The mod accepts nothing else — it parses the
+     * argument by looking for `Hitem:` and ignores plain names.
+     */
+    public function testEquippingSendsARealItemLink(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->expects(self::once())
+            ->method('execute')
+            ->with('playerbots exec Nytalleath !e |Hitem:7281:0:0:0:0:0:0:0:0|h[item]|h|r')
+            ->willReturn('ok');
+
+        (new PlayerbotCommandRunner($world))->equipItem('Nytalleath', 7281);
+    }
+
+    public function testEquippingNothingIsRefused(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->expects(self::never())->method('execute');
+
+        $this->expectException(WorldGatewayException::class);
+
+        (new PlayerbotCommandRunner($world))->equipItem('Nytalleath', 0);
+    }
 }
