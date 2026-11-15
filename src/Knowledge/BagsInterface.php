@@ -18,4 +18,21 @@ interface BagsInterface
      * @return array{entry: int, name: string, quality: int, item_level: int}|null
      */
     public function wearableNamed(int $guid, string $name): ?array;
+
+    /**
+     * Anything in their bags whose name matches — a sword a priest cannot use, a grey trinket,
+     * a stack of linen. {@see wearableNamed()} deliberately ignores all of that, because you
+     * cannot put on a Linen Cloth; handing one over is a different question.
+     *
+     * @return array{entry: int, name: string, quality: int, item_level: int, count: int}|null
+     */
+    public function anythingNamed(int $guid, string $name): ?array;
+
+    /**
+     * What they are carrying that is worth no more than the given quality — 0 is poor, the
+     * grey junk that fills bags after an afternoon.
+     *
+     * @return array<int, array{entry: int, name: string, quality: int, count: int}>
+     */
+    public function noBetterThan(int $guid, int $quality = 0, int $limit = 30): array;
 }

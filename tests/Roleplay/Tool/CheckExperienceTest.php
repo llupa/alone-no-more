@@ -8,6 +8,7 @@ use App\Knowledge\BagsInterface;
 use App\Knowledge\Dbc\ZoneBounds;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
+use App\Knowledge\MerchantsInterface;
 use App\Knowledge\QuestLogInterface;
 use App\Roleplay\Errand\ErrandBook;
 use App\Roleplay\Tool\BotCommandContext;
@@ -86,6 +87,7 @@ final class CheckExperienceTest extends TestCase
             $runner,
             $this->createStub(QuestLogInterface::class),
             $this->createStub(BagsInterface::class),
+            $this->createStub(MerchantsInterface::class),
             $this->createStub(GameKnowledgeInterface::class),
             $levels,
             new BotSpeechDispatcher($this->createStub(Connection::class)),

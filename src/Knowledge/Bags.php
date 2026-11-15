@@ -44,18 +44,13 @@ final readonly class Bags implements BagsInterface
             return null;
         }
 
-        $entries = $this->characters->fetchFirstColumn(
-            'SELECT DISTINCT ii.itemEntry
-             FROM character_inventory ci
-             JOIN item_instance ii ON ii.guid = ci.item
-             WHERE ci.guid = :guid',
-            ['guid' => $guid],
-            ['guid' => ParameterType::INTEGER],
-        );
+        $carried = $this->carried($guid);
 
-        if ([] === $entries) {
+        if ([] === $carried) {
             return null;
         }
+
+        $entries = array_keys($carried);
 
         /**
          * `InventoryType = 0` is INVTYPE_NON_EQUIP: reagents, quest items, the grey junk every
@@ -95,5 +90,125 @@ final readonly class Bags implements BagsInterface
             'quality' => (int) $row['quality'],
             'item_level' => (int) $row['item_level'],
         ];
+    }
+
+    /**
+     * What they hold, as entry id => how many.
+     *
+     * `character_inventory` covers worn gear as well as bags, which is deliberate: asked to
+     * hand over a sword they happen to be holding, "I am not carrying that" would be a lie.
+     *
+     * @return array<int, int>
+     */
+    private function carried(int $guid): array
+    {
+        $rows = $this->characters->fetchAllAssociative(
+            'SELECT ii.itemEntry AS entry, SUM(ii.count) AS n
+             FROM character_inventory ci
+             JOIN item_instance ii ON ii.guid = ci.item
+             WHERE ci.guid = :guid
+             GROUP BY ii.itemEntry',
+            ['guid' => $guid],
+            ['guid' => ParameterType::INTEGER],
+        );
+
+        $carried = [];
+
+        foreach ($rows as $row) {
+            $carried[(int) $row['entry']] = max(1, (int) $row['n']);
+        }
+
+        return $carried;
+    }
+
+    /**
+     * @return array{entry: int, name: string, quality: int, item_level: int, count: int}|null
+     */
+    public function anythingNamed(int $guid, string $name): ?array
+    {
+        $name = trim($name);
+        $carried = $this->carried($guid);
+
+        if ('' === $name || [] === $carried) {
+            return null;
+        }
+
+        $row = $this->world->fetchAssociative(
+            <<<'SQL'
+                SELECT entry, name, Quality AS quality, ItemLevel AS item_level
+                FROM item_template
+                WHERE entry IN (:entries)
+                  AND name LIKE :like
+                ORDER BY (name = :exact) DESC, (name LIKE :prefix) DESC, ItemLevel DESC
+                LIMIT 1
+                SQL,
+            [
+                'entries' => array_keys($carried),
+                'like' => '%'.$name.'%',
+                'exact' => $name,
+                'prefix' => $name.'%',
+            ],
+            ['entries' => ArrayParameterType::INTEGER],
+        );
+
+        if (false === $row) {
+            return null;
+        }
+
+        $entry = (int) $row['entry'];
+
+        return [
+            'entry' => $entry,
+            'name' => (string) $row['name'],
+            'quality' => (int) $row['quality'],
+            'item_level' => (int) $row['item_level'],
+            'count' => $carried[$entry] ?? 1,
+        ];
+    }
+
+    /**
+     * @return array<int, array{entry: int, name: string, quality: int, count: int}>
+     */
+    public function noBetterThan(int $guid, int $quality = 0, int $limit = 30): array
+    {
+        $carried = $this->carried($guid);
+
+        if ([] === $carried) {
+            return [];
+        }
+
+        $rows = $this->world->fetchAllAssociative(
+            <<<'SQL'
+                SELECT entry, name, Quality AS quality
+                FROM item_template
+                WHERE entry IN (:entries)
+                  AND Quality <= :quality
+                  -- Quest items are grey often enough, and selling one costs an evening.
+                  AND Class <> 12
+                  AND (Flags & 2048) = 0
+                ORDER BY Quality, name
+                LIMIT :limit
+                SQL,
+            [
+                'entries' => array_keys($carried),
+                'quality' => $quality,
+                'limit' => $limit,
+            ],
+            [
+                'entries' => ArrayParameterType::INTEGER,
+                'quality' => ParameterType::INTEGER,
+                'limit' => ParameterType::INTEGER,
+            ],
+        );
+
+        return array_map(
+            static fn (array $r): array => [
+                'entry' => (int) $r['entry'],
+                'name' => (string) $r['name'],
+                'quality' => (int) $r['quality'],
+                'count' => $carried[(int) $r['entry']] ?? 1,
+            ],
+            $rows,
+        );
     }
 }

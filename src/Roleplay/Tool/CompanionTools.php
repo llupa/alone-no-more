@@ -10,6 +10,7 @@ use App\Knowledge\Cities;
 use App\Knowledge\Dbc\ZoneBounds;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
+use App\Knowledge\MerchantsInterface;
 use App\Knowledge\QuestLogInterface;
 use App\Roleplay\Errand\Errand;
 use App\Roleplay\Errand\ErrandBook;
@@ -122,6 +123,26 @@ use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
     method: 'checkTheirQuestLog',
 )]
 #[AsTool(
+    name: 'sell_junk',
+    description: <<<'TXT'
+        Sell your worthless things to a merchant. Use when the player tells you to sell, vendor
+        or get rid of grey or poor-quality items, or says your bags are full. You must be
+        standing at a merchant; if the answer says there is none, say so and name how far the
+        nearest one is rather than pretending. This never sells anything good — only grey.
+        TXT,
+    method: 'sellJunk',
+)]
+#[AsTool(
+    name: 'hand_over',
+    description: <<<'TXT'
+        Offer something from your bags to the player. Use when they ask you to give, hand over,
+        pass or trade them something, or to show them what you found. Pass the name they used.
+        This opens a trade window and puts the item in it — the player still has to accept, so
+        tell them to. You cannot give away what you are not carrying.
+        TXT,
+    method: 'handOver',
+)]
+#[AsTool(
     name: 'check_my_bags',
     description: 'Look through what you are carrying. Use when the player asks what you have, whether you have food, water, or some particular thing.',
     method: 'checkMyBags',
@@ -176,6 +197,7 @@ final readonly class CompanionTools
         private PlayerbotCommandRunner $runner,
         private QuestLogInterface $questLog,
         private BagsInterface $bags,
+        private MerchantsInterface $merchants,
         private GameKnowledgeInterface $knowledge,
         private LevelProgressInterface $levels,
         private BotSpeechDispatcher $speech,
@@ -450,8 +472,89 @@ final readonly class CompanionTools
     }
 
     /**
-     * @param string $item the name of a piece of gear in the companion's own bags
+     * Sell the grey things, which needs a merchant the companion can actually reach.
+     *
+     * The mod's `sell` looks through the bot's own nearest NPCs for a vendor and silently does
+     * nothing when there is none — indistinguishable, from out here, from having sold. So the
+     * merchant is looked up first and the honest answer given either way. Naming the nearest
+     * one is more use to a player than a refusal.
      */
+    public function sellJunk(): string
+    {
+        $bot = $this->context->bot();
+
+        if (!$this->merchants->isOneAtHand($bot->position)) {
+            $nearest = $this->merchants->nearest($bot->position);
+
+            return null === $nearest
+                ? 'There is no merchant anywhere near. Say so, and suggest finding a town.'
+                : \sprintf(
+                    'You are not close enough to a merchant to sell. %s is about %d paces off. '
+                    .'Say so, and offer to go there.',
+                    $nearest['name'],
+                    (int) round($nearest['yards']),
+                );
+        }
+
+        $junk = $this->bags->noBetterThan($bot->guid);
+
+        if ([] === $junk) {
+            return 'You have nothing worthless to sell. Say so.';
+        }
+
+        try {
+            $this->runner->run($bot->name, 's gray');
+        } catch (WorldGatewayException $e) {
+            return 'You could not: '.$e->getMessage();
+        }
+
+        return \sprintf(
+            'Sold: %s. Mention one or two of them, not the whole list.',
+            implode(', ', array_map(
+                static fn (array $item): string => $item['count'] > 1
+                    ? \sprintf('%s x%d', $item['name'], $item['count'])
+                    : $item['name'],
+                \array_slice($junk, 0, 8),
+            )),
+        );
+    }
+
+    /**
+     * Put something in the player's hands, which in this game means a trade window.
+     *
+     * There is no quiet transfer available: the mod's `GiveItemAction` refuses unless the
+     * receiver is another bot, so the only route is `trade`, which opens the window and places
+     * the item. The player still has to accept — and should, because nothing ought to move
+     * between inventories without them seeing it.
+     */
+    public function handOver(string $item): string
+    {
+        $item = trim($item);
+
+        if (1 !== preg_match("/^[A-Za-z0-9 '\\-]{2,40}$/", $item)) {
+            return \sprintf('"%s" is not the name of a thing you could hand over.', $item);
+        }
+
+        $bot = $this->context->bot();
+        $found = $this->bags->anythingNamed($bot->guid, $item);
+
+        if (null === $found) {
+            return \sprintf('You are not carrying anything called "%s". Say so plainly.', $item);
+        }
+
+        try {
+            $this->runner->openTrade($bot->name);
+            $this->runner->offerItem($bot->name, $found['entry'], $found['count']);
+        } catch (WorldGatewayException $e) {
+            return 'You could not: '.$e->getMessage();
+        }
+
+        return \sprintf(
+            'You have opened a trade and put your %s in it. Tell them to accept it.',
+            $found['name'],
+        );
+    }
+
     public function wearThis(string $item): string
     {
         $item = trim($item);

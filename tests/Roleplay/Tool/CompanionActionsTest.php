@@ -8,6 +8,7 @@ use App\Knowledge\BagsInterface;
 use App\Knowledge\Dbc\ZoneBounds;
 use App\Knowledge\GameKnowledgeInterface;
 use App\Knowledge\LevelProgressInterface;
+use App\Knowledge\MerchantsInterface;
 use App\Knowledge\QuestLogInterface;
 use App\Roleplay\Errand\ErrandBook;
 use App\Roleplay\Tool\BotCommandContext;
@@ -166,6 +167,7 @@ final class CompanionActionsTest extends TestCase
             $runner,
             $this->createStub(QuestLogInterface::class),
             $bags ?? $this->createStub(BagsInterface::class),
+            $this->createStub(MerchantsInterface::class),
             $this->createStub(GameKnowledgeInterface::class),
             $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),

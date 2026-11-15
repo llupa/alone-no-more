@@ -23,7 +23,7 @@ final class BagsTest extends TestCase
     public function testItFindsSomethingTheCharacterIsCarrying(): void
     {
         $characters = $this->createMock(Connection::class);
-        $characters->method('fetchFirstColumn')->willReturn([7281, 2589]);
+        $characters->method('fetchAllAssociative')->willReturn([['entry' => 7281, 'n' => 1], ['entry' => 2589, 'n' => 3]]);
 
         $world = $this->createMock(Connection::class);
         $world->method('fetchAssociative')->willReturn([
@@ -42,7 +42,7 @@ final class BagsTest extends TestCase
     public function testEmptyBagsAreNotAQuestionForTheWorldDatabase(): void
     {
         $characters = $this->createMock(Connection::class);
-        $characters->method('fetchFirstColumn')->willReturn([]);
+        $characters->method('fetchAllAssociative')->willReturn([]);
 
         $world = $this->createMock(Connection::class);
         $world->expects(self::never())->method('fetchAssociative');
@@ -53,7 +53,7 @@ final class BagsTest extends TestCase
     public function testCarryingSomethingElseIsNotAMatch(): void
     {
         $characters = $this->createMock(Connection::class);
-        $characters->method('fetchFirstColumn')->willReturn([2589]);
+        $characters->method('fetchAllAssociative')->willReturn([['entry' => 2589, 'n' => 1]]);
 
         $world = $this->createMock(Connection::class);
         $world->method('fetchAssociative')->willReturn(false);
@@ -67,7 +67,7 @@ final class BagsTest extends TestCase
     public function testABlankNameMatchesNothing(): void
     {
         $characters = $this->createMock(Connection::class);
-        $characters->expects(self::never())->method('fetchFirstColumn');
+        $characters->expects(self::never())->method('fetchAllAssociative');
 
         self::assertNull(
             (new Bags($characters, $this->createMock(Connection::class)))->wearableNamed(1, '   '),

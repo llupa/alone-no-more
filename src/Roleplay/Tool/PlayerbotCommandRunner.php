@@ -171,6 +171,56 @@ final readonly class PlayerbotCommandRunner
     }
 
     /**
+     * Open a trade window with the player.
+     *
+     * `TradeAction` with nothing to trade sends CMSG_INITIATE_TRADE at the bot's master, which
+     * is the only way a companion can put something in a player's hands: `GiveItemAction`
+     * refuses unless the receiver is itself a bot, so there is no quiet transfer. The window
+     * has to open and the player has to accept, which is right — nothing should move between
+     * inventories without them seeing it.
+     *
+     * @throws WorldGatewayException when the name is malformed or the server refuses
+     */
+    public function openTrade(string $botName): string
+    {
+        if (1 !== preg_match(self::NAME, $botName)) {
+            throw new WorldGatewayException(\sprintf('"%s" is not a character name.', $botName));
+        }
+
+        return $this->send($botName, 'trade');
+    }
+
+    /**
+     * Put one item from the bot's bags into the open trade window.
+     *
+     * Same reasoning as {@see equipItem()}: `TradeAction` parses items with
+     * `ChatHelper::parseItems`, which reads links and nothing else, and a link carries
+     * punctuation {@see COMMAND} refuses. So it is built here from an entry id the caller
+     * looked up in the bot's own inventory.
+     *
+     * @param int $itemEntry an `item_template` id the bot is carrying
+     * @param int $count     how many, for stacks
+     *
+     * @throws WorldGatewayException when the name is malformed or the server refuses
+     */
+    public function offerItem(string $botName, int $itemEntry, int $count = 1): string
+    {
+        if (1 !== preg_match(self::NAME, $botName)) {
+            throw new WorldGatewayException(\sprintf('"%s" is not a character name.', $botName));
+        }
+
+        if ($itemEntry < 1) {
+            throw new WorldGatewayException(\sprintf('%d is not an item.', $itemEntry));
+        }
+
+        return $this->send($botName, \sprintf(
+            'trade |Hitem:%d:0:0:0:0:0:0:0:0|h[item]|h|r %d',
+            $itemEntry,
+            max(1, $count),
+        ));
+    }
+
+    /**
      * @return string the server's acknowledgement, e.g. `Nytalleath: 'follow' sent`
      *
      * @throws WorldGatewayException when the name or command is malformed, the bot is offline,

@@ -19,4 +19,14 @@ final readonly class ReplayBags implements BagsInterface
     {
         return null;
     }
+
+    public function anythingNamed(int $guid, string $name): ?array
+    {
+        return null;
+    }
+
+    public function noBetterThan(int $guid, int $quality = 0, int $limit = 30): array
+    {
+        return [];
+    }
 }
