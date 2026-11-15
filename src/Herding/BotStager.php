@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Herding;
 
 use App\Config\Settings;
+use App\Knowledge\Cities;
 use App\Knowledge\Dbc\AreaNames;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\GroupRepositoryInterface;
@@ -46,6 +47,23 @@ final readonly class BotStager implements BotStagerInterface
         private Settings $settings,
         #[Autowire(env: 'float:ANM_HERD_RADIUS')]
         private float $radius = 600.0,
+        /**
+         * The same crowd, gathered tighter, when the player is in a capital.
+         *
+         * Six hundred yards is a zone's worth of countryside and a city's worth of *outskirts*:
+         * from the Trade District that sphere reaches past the walls into Elwynn, so the crowd
+         * was staged around Stormwind rather than in it. The player counted it with /who —
+         * seven people in the city, forty-odd in the forest — which is exactly the shape of a
+         * radius that does not know where the walls are.
+         */
+        #[Autowire(env: 'float:ANM_HERD_CITY_RADIUS')]
+        private float $cityRadius = 250.0,
+        /**
+         * And more of them, because a capital is vertical. The same fifty people that fill a
+         * village disappear into a city's districts, floors and doorways.
+         */
+        #[Autowire(env: 'int:ANM_HERD_CITY_EXTRA')]
+        private int $cityExtra = 50,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -55,15 +73,20 @@ final readonly class BotStager implements BotStagerInterface
      */
     public function stage(Actor $player, ?int $target = null): StagingResult
     {
-        $target ??= $this->settings->crowdSize();
-        $present = $this->roster->onlineBotsWithin($player->position, $this->radius);
+        // A capital is gathered tighter and fuller than open country, and only while the
+        // player is actually standing in one — cities nobody is in are left alone.
+        $inCity = Cities::isCity($player->zoneId);
+        $radius = $inCity ? $this->cityRadius : $this->radius;
+
+        $target ??= $this->settings->crowdSize() + ($inCity ? $this->cityExtra : 0);
+        $present = $this->roster->onlineBotsWithin($player->position, $radius);
         $wanted = $target - $present;
 
         if ($wanted <= 0) {
             return new StagingResult($present, $target, [], []);
         }
 
-        $places = $this->places->around($player->position, $this->radius, $wanted * 2);
+        $places = $this->places->around($player->position, $radius, $wanted * 2);
 
         if ([] === $places) {
             // Open water, an unfinished area, or somewhere with no creature spawns at all.
