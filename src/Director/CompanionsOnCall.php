@@ -7,6 +7,7 @@ namespace App\Director;
 use App\Herding\BotRoster;
 use App\Herding\ProtectedBots;
 use App\World\Chat\BotSpeechDispatcher;
+use App\World\GroupRepositoryInterface;
 use App\World\Model\Actor;
 use App\World\WorldGatewayInterface;
 use Psr\Log\LoggerInterface;
@@ -32,6 +33,7 @@ final readonly class CompanionsOnCall implements ProtectedBots
         private WorldGatewayInterface $world,
         private BotRoster $roster,
         private BotSpeechDispatcher $speech,
+        private GroupRepositoryInterface $groups,
         private LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -56,6 +58,13 @@ final readonly class CompanionsOnCall implements ProtectedBots
             $bot = $this->world->findActorByGuid($request['bot_guid']);
 
             if (null !== $bot && $bot->isOnline && $this->isWithReach($bot, $player)) {
+                continue;
+            }
+
+            // Grouped is an answer in itself. Whatever the distance, a companion in the
+            // player's party is not lost — and logging one out to put them somewhere better
+            // takes the party down with them, which is a steep price for tidiness.
+            if (null !== $bot && $bot->isOnline && $this->groups->isGrouped($request['bot_guid'])) {
                 continue;
             }
 
@@ -101,8 +110,12 @@ final readonly class CompanionsOnCall implements ProtectedBots
      */
     private function isWithReach(Actor $bot, Actor $player): bool
     {
-        return $bot->zoneId === $player->zoneId
-            && $bot->position->mapId === $player->position->mapId
+        // Distance and continent, deliberately not zone. Matching zone ids looked like a
+        // stricter version of the same question and is a different one: a companion standing
+        // ten yards away across a border is plainly still with you, and requiring the ids to
+        // match meant every zone change logged them out and re-placed them — which disbanded
+        // the party, because a bot that logs out leaves the group it was in.
+        return $bot->position->mapId === $player->position->mapId
             && $bot->isWithin(self::STILL_HERE_YARDS, $player);
     }
 

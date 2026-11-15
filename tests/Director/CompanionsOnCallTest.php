@@ -9,6 +9,7 @@ use App\Director\CompanionsOnCall;
 use App\Herding\BotRoster;
 use App\Tests\Roleplay\ActorMother;
 use App\World\Chat\BotSpeechDispatcher;
+use App\World\GroupRepositoryInterface;
 use App\World\Model\Position;
 use App\World\WorldGatewayInterface;
 use Doctrine\DBAL\Connection;
@@ -52,6 +53,7 @@ final class CompanionsOnCallTest extends TestCase
             $world,
             new BotRoster($this->createStub(Connection::class)),
             new BotSpeechDispatcher($outbox),
+            $this->createStub(GroupRepositoryInterface::class),
         );
 
         $onCall->gather(ActorMother::player(self::PLAYER, at: new Position(-9894.0, 344.0, 40.0, 0), zoneId: 12));
@@ -79,6 +81,7 @@ final class CompanionsOnCallTest extends TestCase
             $world,
             new BotRoster($this->createStub(Connection::class)),
             new BotSpeechDispatcher($outbox),
+            $this->createStub(GroupRepositoryInterface::class),
         );
 
         self::assertSame([], $onCall->gather(
@@ -107,12 +110,73 @@ final class CompanionsOnCallTest extends TestCase
             $world,
             new BotRoster($this->createStub(Connection::class)),
             new BotSpeechDispatcher($outbox),
+            $this->createStub(GroupRepositoryInterface::class),
         );
 
         $onCall->gather(
             ActorMother::player(self::PLAYER, at: new Position(-9894.0, 344.0, 40.0, 0), zoneId: 12),
             busy: [self::BOT],
         );
+
+        self::assertSame([], $queued);
+    }
+
+    /**
+     * A companion in the player's party is never hauled back, whatever the distance.
+     *
+     * Logging a bot out removes it from the group, so "fixing" where a party member stands
+     * disbands the party to do it. The player hit this on every zone change: Anduril went
+     * offline and the group fell apart, because crossing a border counted as wandering off.
+     */
+    public function testAGroupedCompanionIsNeverLoggedOut(): void
+    {
+        $queued = [];
+        $outbox = $this->outboxRecording($queued);
+
+        $world = $this->createStub(WorldGatewayInterface::class);
+        $world->method('findActorByGuid')->willReturn(
+            ActorMother::bot(self::BOT, 'Anduril', at: new Position(-10607.0, 294.0, 40.0, 0), zoneId: 10),
+        );
+
+        $groups = $this->createStub(GroupRepositoryInterface::class);
+        $groups->method('isGrouped')->willReturn(true);
+
+        $onCall = new CompanionsOnCall(
+            $this->requestsFor(),
+            $world,
+            new BotRoster($this->createStub(Connection::class)),
+            new BotSpeechDispatcher($outbox),
+            $groups,
+        );
+
+        $onCall->gather(ActorMother::player(self::PLAYER, at: new Position(-9894.0, 344.0, 40.0, 0), zoneId: 12));
+
+        self::assertSame([], $queued);
+    }
+
+    /**
+     * Crossing a zone border is not wandering off. Zone ids are arbitrary lines on the ground
+     * and a companion ten yards away across one is plainly still with you.
+     */
+    public function testStandingBesideThePlayerInAnotherZoneIsStillHere(): void
+    {
+        $queued = [];
+        $outbox = $this->outboxRecording($queued);
+
+        $world = $this->createStub(WorldGatewayInterface::class);
+        $world->method('findActorByGuid')->willReturn(
+            ActorMother::bot(self::BOT, 'Anduril', at: new Position(-9890.0, 350.0, 40.0, 0), zoneId: 10),
+        );
+
+        $onCall = new CompanionsOnCall(
+            $this->requestsFor(),
+            $world,
+            new BotRoster($this->createStub(Connection::class)),
+            new BotSpeechDispatcher($outbox),
+            $this->createStub(GroupRepositoryInterface::class),
+        );
+
+        $onCall->gather(ActorMother::player(self::PLAYER, at: new Position(-9894.0, 344.0, 40.0, 0), zoneId: 12));
 
         self::assertSame([], $queued);
     }
