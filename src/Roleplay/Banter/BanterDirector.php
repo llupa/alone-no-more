@@ -53,9 +53,16 @@ final class BanterDirector
         /** Nobody out of earshot: /say carries about this far, so a line nobody hears is a line wasted. */
         #[Autowire(env: 'float:ANM_BANTER_RADIUS')]
         private readonly float $radius = 25.0,
-        /** How often the world is allowed to mutter. Fifty bots in earshot makes this the only thing between flavour and a wall of text. */
+        /**
+         * How often the world is allowed to mutter.
+         *
+         * Three minutes was the first guess and it was far too often in play: the lines are
+         * good individually and relentless together, and a companion saying something every
+         * few minutes stops reading as a world and starts reading as a feature. Half an hour
+         * makes it a pleasant surprise, which is the whole point of it.
+         */
         #[Autowire(env: 'int:ANM_BANTER_SECONDS')]
-        private readonly int $everySeconds = 180,
+        private readonly int $everySeconds = 1800,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
