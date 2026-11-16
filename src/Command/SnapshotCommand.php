@@ -55,6 +55,8 @@ final class SnapshotCommand
         float $radius = 300.0,
         #[Option(description: 'How many recent chat lines to include.')]
         int $chatLines = 60,
+        #[Option(description: 'Only chat from this moment on, e.g. "2026-11-16 20:00" or "-90 minutes". Captures a session rather than whatever was said most recently.')]
+        ?string $since = null,
     ): int {
         $this->world->refresh();
 
@@ -112,7 +114,7 @@ final class SnapshotCommand
             'actors' => array_values(array_map(self::actorRow(...), $actors)),
             'groups' => $this->groupsOf($actors),
             'questLogs' => $this->questLogsOf($actors),
-            'chat' => $this->chatRows($chatLines),
+            'chat' => $this->chatRows($chatLines, $since),
             'creatures' => $this->creatureRows($creatures, $centre),
             'quests' => array_values($quests),
             'items' => array_values($items),
@@ -243,11 +245,25 @@ final class SnapshotCommand
     }
 
     /**
+     * @param string|null $since a moment to start from, rather than a count back from now
+     *
      * @return array<int, array<string, mixed>>
      */
-    private function chatRows(int $limit): array
+    private function chatRows(int $limit, ?string $since): array
     {
+        // Counting back from the newest line captures whatever the world happened to say, and
+        // in a busy zone most of that is strangers muttering. A session has a beginning, and
+        // the table is timestamped, so saying when is better than guessing how many.
+        $watermark = null !== $since
+            ? $this->chat->firstIdSince($since)
+            : null;
+
+        if (null !== $since && null === $watermark) {
+            return [];
+        }
+
         $latest = $this->chat->latestId();
+        $watermark ??= max(0, $latest - $limit);
 
         return array_map(static fn (ChatEvent $e): array => [
             'id' => $e->id,
@@ -263,7 +279,7 @@ final class SnapshotCommand
             'z' => $e->position->z,
             'map' => $e->position->mapId,
             'senderIsBot' => $e->senderIsBot,
-        ], $this->chat->since(max(0, $latest - $limit), $limit));
+        ], $this->chat->since($watermark - 1, $limit));
     }
 
     /**

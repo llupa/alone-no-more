@@ -50,6 +50,18 @@ final readonly class ChatEventRepository implements ChatEventRepositoryInterface
         return array_values(array_filter(array_map($this->hydrate(...), $rows)));
     }
 
+    public function firstIdSince(string $at): ?int
+    {
+        $moment = new \DateTimeImmutable($at);
+
+        $id = $this->connection->fetchOne(
+            'SELECT MIN(id) FROM anm_chat_event WHERE created_at >= :at',
+            ['at' => $moment->format('Y-m-d H:i:s')],
+        );
+
+        return \is_numeric($id) ? (int) $id : null;
+    }
+
     /**
      * Highest id currently in the log. Used to start tailing from "now" rather than replaying
      * every line ever said when the app boots.

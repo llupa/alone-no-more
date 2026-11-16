@@ -35,6 +35,15 @@ final class ReplayChatEvents implements ChatEventRepositoryInterface
         return \array_slice($newer, 0, $limit);
     }
 
+    /**
+     * A recording has no clock worth consulting: every line in it was said before it was
+     * written down. The whole capture is "since" any moment you could name.
+     */
+    public function firstIdSince(string $at): int
+    {
+        return 0;
+    }
+
     public function latestId(): int
     {
         $events = $this->events();
