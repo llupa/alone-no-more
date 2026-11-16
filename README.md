@@ -201,13 +201,18 @@ every fact in a prompt comes from the server's own tables.
 ## Development
 
 ```bash
-bin/phpunit                                   # 288 tests
+bin/phpunit                                   # 288 tests, 13 of which need client data
 vendor/bin/phpstan analyse                    # level 8, src and tests
 vendor/bin/deptrac analyse                    # layers may depend downward only
 bin/console lint:container                    # DI must stay green
 vendor/bin/php-cs-fixer fix                   # @Symfony ruleset
 bin/console anm:snapshot Doppel               # recapture the replay fixture
 ```
+
+The thirteen that skip read `AreaTable.dbc` and `WorldMapArea.dbc`, which ship with the game
+client and cannot be committed. Point `ANM_DBC_DIR` at your server's `data/dbc` in
+`.env.test.local` and they run; without it they skip rather than fail, because a missing zone
+name degrades to the continent and that is a real, supported state.
 
 Every outbound integration sits behind an interface — `WorldGatewayInterface`,
 `GameKnowledgeInterface`, `QuestLogInterface`, `BotStagerInterface` — which is what lets the
