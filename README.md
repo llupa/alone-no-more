@@ -117,6 +117,10 @@ running world.
 Everything above runs against a recording. To play it for real you need AzerothCore with
 mod-playerbots, our C++ module built into it, and a 3.3.5a client.
 
+Be aware before you start that mod-playerbots does **not** build against upstream AzerothCore —
+it needs the `Playerbot` branch of a fork. The guide below names the repositories and the
+revisions this was built against, because getting that wrong fails at build time, an hour in.
+
 **→ [docs/real-server.md](docs/real-server.md)** — written to be followed step by step, with
 the reason given for each setting that is not obvious. About fifteen minutes if the server is
 already up.

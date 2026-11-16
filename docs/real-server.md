@@ -9,18 +9,63 @@ the reason is given — those are the steps that get skipped and then cost an ev
 
 ---
 
-## 1. What you need first
+## 0. The server itself, which this project does not install
+
+**Read this step even if you are in a hurry.** It is the one that goes wrong, and it goes wrong
+in a way that only shows up an hour later at build time.
+
+mod-playerbots does **not** build against upstream AzerothCore. It needs a fork, on a branch
+that is not the default:
+
+```bash
+# The server. Note the organisation and the branch — not azerothcore/azerothcore-wotlk.
+git clone -b Playerbot https://github.com/mod-playerbots/azerothcore-wotlk.git
+cd azerothcore-wotlk
+
+# The bots, as a module inside it.
+git clone https://github.com/mod-playerbots/mod-playerbots.git modules/mod-playerbots
+```
+
+Known good here: AzerothCore `e7e2e28` (Playerbot branch) with mod-playerbots `405f811`, both
+2026-11-05. If something fails to build, check you are on that fork and branch before anything
+else.
+
+From there, follow **[AzerothCore's own installation guide](https://www.azerothcore.org/wiki/installation)**
+for your platform — building the core, creating the three databases (`acore_auth`,
+`acore_world`, `acore_characters`), and **extracting the client data** (`dbc`, `maps`, `vmaps`,
+`mmaps`) from a 3.3.5a client into the server's `data/` directory. That extraction takes a
+while and is not optional: without `mmaps` the bots cannot path, which looks like our leading
+being broken and is not.
+
+We do not reproduce that guide here. It is long, platform-specific, and maintained by people
+who keep it correct.
+
+### You are ready for the next step when all of these are true
+
+```bash
+# the worldserver starts and reports the Playerbot branch
+./worldserver --version 2>/dev/null | head -1     # or just watch it boot
+
+# you can log in with the 3.3.5a client and create a character, and then — typed in game,
+# not in the server console, because this particular command is in-game only:
+.playerbots bot add <somebotname>
+```
+
+If you can log in, and summon one bot that follows you, the server is ready and nothing below
+is about AzerothCore any more.
+
+---
+
+## 1. What you need on the application side
 
 - **PHP 8.4 or newer**, with `pdo_mysql`, `soap`, `sockets`, `mbstring`, `iconv` and `ctype`.
   Check with `php -m`.
 - **Composer**.
-- **AzerothCore** (wotlk, 3.3.5a) built and running, with its databases populated.
-- **[mod-playerbots](https://github.com/mod-playerbots/azerothcore-wotlk)** installed into that
-  server and working — you should be able to log in and summon a bot before adding anything of
-  ours.
-- A **3.3.5a client** pointed at your server.
+- The server from step 0, running.
+- A **3.3.5a client** pointed at it.
 
-This project does not install or patch AzerothCore. It stands beside one.
+This project stands beside AzerothCore. It does not install it, patch it, or require changes to
+its source — only the one module in step 2, and four settings in step 3.
 
 ---
 
@@ -32,6 +77,8 @@ does exactly those and nothing else.
 
 Link it into your AzerothCore modules directory and rebuild:
 
+On Linux or macOS:
+
 ```bash
 ln -s /absolute/path/to/alone-no-more/server/mod-anm-bridge \
       /path/to/azerothcore/modules/mod-anm-bridge
@@ -42,8 +89,17 @@ make -j8 worldserver
 make install
 ```
 
-A symlink rather than a copy, so the module is versioned with this repository and a rebuild
-picks up changes without copying files about.
+On Windows, from an elevated prompt (or copy the directory instead — you then have to re-copy
+it whenever this repository changes):
+
+```cmd
+mklink /D "C:\path\to\azerothcore\modules\mod-anm-bridge" "C:\path\to\alone-no-more\server\mod-anm-bridge"
+```
+
+…then re-run CMake and rebuild the `worldserver` project in Visual Studio.
+
+A link rather than a copy, so the module stays versioned with this repository and a rebuild
+picks up changes without anyone remembering to copy files about.
 
 It creates its own tables (`anm_chat_event`, `anm_outbox`, `anm_milestone`) in the characters
 database on first start. There is no SQL to run.
