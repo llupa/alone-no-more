@@ -3,7 +3,7 @@
 A dead MMO server, brought back to life by a PHP application standing next to it.
 
 *Alone No More* runs alongside a local [AzerothCore](https://www.azerothcore.org/) server with
-[mod-playerbots](https://github.com/mod-playerbots/azerothcore-wotlk). It does two things the
+[mod-playerbots](https://github.com/mod-playerbots/azerothcore-wotlk). It does three things the
 server cannot do for itself:
 
 - **It herds a crowd.** Rather than logging in two thousand bots and hoping some are near you,
@@ -12,8 +12,12 @@ server cannot do for itself:
 - **It gives them something to say.** Companions hold a conversation grounded in the server's
   own database: the quest you linked, what it still needs, where the thing you are missing
   actually drops, and what is standing near you right now.
+- **And something to do.** "Take me to Marshal Dughan" and one walks you there, fighting what
+  interrupts it and picking the walk up again afterwards. "Sell your junk" at a merchant, "give
+  me that sword", "put those on" — ordinary sentences, no slash commands. Where the mod's own
+  vocabulary could not reach, we wrote the C++ for it.
 
-Both are exposed over **MCP**, so an assistant can look at the living world and change it.
+All of it is exposed over **MCP**, so an assistant can look at the living world and change it.
 
 ```
 > what's happening in Teldrassil?
@@ -68,8 +72,8 @@ Drop `APP_ENV` once you have a real server and the same tools drive it.
 
 ## The MCP tools
 
-Seventeen, split by whether they change anything — a client may run a read-only tool without asking
-permission, so the split is a permission boundary rather than tidiness.
+Twenty-two, split by whether they change anything — a client may run a read-only tool without
+asking permission, so the split is a permission boundary rather than tidiness.
 
 | Tool | What it answers | Changes the world |
 |---|---|---|
@@ -79,8 +83,13 @@ permission, so the split is a permission boundary rather than tidiness.
 | `look_up_quest` | A quest on **this** server, every step when a chain reuses a title | no |
 | `look_up_item` | Quality, item level, required level | no |
 | `where_to_get` | Which creatures drop it, or which chest holds it, and where | no |
+| `where_is` | Where a named person or creature stands | no |
+| `find_creature` | What these things are, how tough, and roughly where | no |
 | `what_needs_item` | Which quests want the thing in your bag | no |
 | `recent_chat` | What the world has been saying | no |
+| `prepare_companion` | Set a specific character aside to play with later | **yes** |
+| `planned_companions` | Who is waiting for a character | no |
+| `cancel_companion` | Stop keeping one aside | **yes** |
 | `summon_crowd` | Populate a zone with level-appropriate bots | **yes** |
 | `send_bots_away` | Thin a crowd without emptying it | **yes** |
 | `bot_command` | Give one companion an order | **yes** |
@@ -126,8 +135,9 @@ account set gmlevel anm 3 -1
 `.env.local`, which is git-ignored:
 
 ```dotenv
-ANM_WORLD_DSN=mysql://acore:acore@127.0.0.1:3306/acore_world
-ANM_CHARACTERS_DSN=mysql://acore:acore@127.0.0.1:3306/acore_characters
+# Only if yours differ from the committed defaults — 3306 is often already taken.
+ANM_WORLD_DSN=mysql://acore:acore@127.0.0.1:3307/acore_world
+ANM_CHARACTERS_DSN=mysql://acore:acore@127.0.0.1:3307/acore_characters
 ANM_SOAP_ENDPOINT=http://127.0.0.1:7878/
 ANM_SOAP_USERNAME=anm
 ANM_SOAP_PASSWORD=<the password you chose>
@@ -144,6 +154,8 @@ ANTHROPIC_API_KEY=sk-ant-...
 `anm:smoke` tells you which of these is wrong before anything else runs:
 
 ```bash
+./server.sh start                   # the worldserver, with its console off and its output
+                                    # redirected — see the script for why that matters
 bin/console anm:smoke               # server reachable, databases readable, chat captured
 bin/console anm:world Doppel        # who is near you
 bin/console anm:herd Doppel         # bring a crowd to your zone
@@ -189,7 +201,7 @@ every fact in a prompt comes from the server's own tables.
 ## Development
 
 ```bash
-bin/phpunit                                   # 248 tests
+bin/phpunit                                   # 288 tests
 vendor/bin/phpstan analyse                    # level 8, src and tests
 vendor/bin/deptrac analyse                    # layers may depend downward only
 bin/console lint:container                    # DI must stay green
