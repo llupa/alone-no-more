@@ -54,6 +54,11 @@ final readonly class Merchants implements MerchantsInterface
                 JOIN creature_template ct ON ct.entry = c.id
                 WHERE c.map = :map
                   AND (ct.npcflag & :vendor) = :vendor
+                  -- Test and debug spawns are vendors too. "[DND] TAR Pedestal - General
+                  -- Goods" is a real row with a real vendor flag, and a companion naming one
+                  -- as the nearest merchant would be worse than saying nothing.
+                  AND ct.name NOT LIKE '[%'
+                  AND (ct.flags_extra & 0x80) = 0
                   AND POW(c.position_x - :x, 2) + POW(c.position_y - :y, 2) <= :within2
                 ORDER BY yards
                 LIMIT 1
