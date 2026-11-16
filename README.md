@@ -114,52 +114,17 @@ running world.
 
 ## Running it against a real server
 
-### What you need
+Everything above runs against a recording. To play it for real you need AzerothCore with
+mod-playerbots, our C++ module built into it, and a 3.3.5a client.
 
-- **PHP 8.4+** with `pdo_mysql`, `soap`, `sockets`, `mbstring`, `iconv`, `ctype`
-- **AzerothCore** with **mod-playerbots**, and our module **`mod-anm-bridge`** (in `server/`)
-- SOAP enabled in `worldserver.conf` (`SOAP.Enabled = 1`)
-- Either an **Anthropic API key** or a local **Ollama** — Ollama is the default so the project
-  runs with no account at all
-
-### Configure
-
-First, a GM account for the app to drive the console with. On your running server:
-
-```
-account create anm <a password you choose>
-account set gmlevel anm 3 -1
-```
-
-`.env` holds defaults and is committed, so no password lives in it. Real values go in
-`.env.local`, which is git-ignored:
-
-```dotenv
-# Only if yours differ from the committed defaults — 3306 is often already taken.
-ANM_WORLD_DSN=mysql://acore:acore@127.0.0.1:3307/acore_world
-ANM_CHARACTERS_DSN=mysql://acore:acore@127.0.0.1:3307/acore_characters
-ANM_SOAP_ENDPOINT=http://127.0.0.1:7878/
-ANM_SOAP_USERNAME=anm
-ANM_SOAP_PASSWORD=<the password you chose>
-
-# Zone and subzone names live in the client data, not on the server.
-ANM_DBC_DIR=/path/to/your/server/data/dbc
-
-ANM_AI_PROVIDER=anthropic          # or "ollama"
-ANTHROPIC_API_KEY=sk-ant-...
-```
-
-### Check it
-
-`anm:smoke` tells you which of these is wrong before anything else runs:
+**→ [docs/real-server.md](docs/real-server.md)** — written to be followed step by step, with
+the reason given for each setting that is not obvious. About fifteen minutes if the server is
+already up.
 
 ```bash
-./server.sh start                   # the worldserver, with its console off and its output
-                                    # redirected — see the script for why that matters
-bin/console anm:smoke               # server reachable, databases readable, chat captured
-bin/console anm:world Doppel        # who is near you
-bin/console anm:herd Doppel         # bring a crowd to your zone
-./listen.sh start                   # the listener: herds, and answers chat
+bin/console anm:smoke    # tests every link and names whichever one is wrong
+./server.sh start
+./listen.sh start
 ```
 
 ---
@@ -182,9 +147,12 @@ bin/console anm:herd Doppel         # bring a crowd to your zone
   └─────────────────────────────────────────────────────┘
 ```
 
-**`mod-anm-bridge`** is a small C++ module we wrote. It captures chat through the core's
-`OnPlayerCanUseChat` hooks into a table, and dispatches orders from an outbox — including logging
-bots in and out, which is what makes herding possible without teleport artefacts.
+**`mod-anm-bridge`** is a small C++ module we wrote, for the things that cannot be done from
+outside the worldserver at all: capturing chat, making a bot say arbitrary text, logging bots in
+and out, attacking something the player has not selected, and walking a companion somewhere
+further than the mod's own 150-yard leash allows.
+**→ [docs/the-server-module.md](docs/the-server-module.md)** — what each part does, and which
+six failed attempts taught us why it has to live in C++.
 
 **Two models, by cost.** A cheap archivist (Haiku) reads database rows — quest templates, loot
 tables, item records — and boils them down to a sentence. The companion (Sonnet) never sees a raw
