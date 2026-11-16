@@ -1,0 +1,329 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Alone No More \u2014 a PHP application standing beside a dead MMO",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1395,
+      770
+    ]
+  },
+  "components": [
+    {
+      "id": "player",
+      "type": "external",
+      "label": "Player",
+      "sublabel": "WoW 3.3.5a client",
+      "pos": [
+        520,
+        40
+      ],
+      "size": [
+        200,
+        60
+      ]
+    },
+    {
+      "id": "worldserver",
+      "type": "cloud",
+      "label": "AzerothCore",
+      "sublabel": "worldserver + mod-playerbots",
+      "pos": [
+        490,
+        166
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "bridge",
+      "type": "backend",
+      "label": "mod-anm-bridge",
+      "sublabel": "our C++ module",
+      "pos": [
+        490,
+        296
+      ],
+      "size": [
+        260,
+        64
+      ],
+      "tag": "in-process"
+    },
+    {
+      "id": "soap",
+      "type": "security",
+      "label": "SOAP console",
+      "sublabel": "GM account, port 7878",
+      "pos": [
+        150,
+        296
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "seam",
+      "type": "messagebus",
+      "label": "anm_chat_event / anm_outbox",
+      "sublabel": "the seam, in the characters DB",
+      "pos": [
+        490,
+        426
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "gamedb",
+      "type": "database",
+      "label": "acore_world / characters",
+      "sublabel": "the server's own tables",
+      "pos": [
+        850,
+        426
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "herding",
+      "type": "backend",
+      "label": "Herding",
+      "sublabel": "who should be awake, and where",
+      "pos": [
+        150,
+        556
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "roleplay",
+      "type": "backend",
+      "label": "Roleplay",
+      "sublabel": "who answers, and what they do",
+      "pos": [
+        490,
+        556
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "knowledge",
+      "type": "backend",
+      "label": "Knowledge",
+      "sublabel": "quests, loot, creatures, zones",
+      "pos": [
+        850,
+        556
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "models",
+      "type": "external",
+      "label": "Anthropic / Ollama",
+      "sublabel": "companion + archivist",
+      "pos": [
+        490,
+        686
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "frontend",
+      "label": "MCP server",
+      "sublabel": "22 tools over stdio",
+      "pos": [
+        850,
+        686
+      ],
+      "size": [
+        220,
+        64
+      ]
+    },
+    {
+      "id": "assistant",
+      "type": "external",
+      "label": "Assistant",
+      "sublabel": "Claude Code, Claude Desktop",
+      "pos": [
+        1108,
+        686
+      ],
+      "size": [
+        200,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "AzerothCore process",
+      "wraps": [
+        "worldserver",
+        "bridge"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Alone No More (PHP 8.5 / Symfony 8.1)",
+      "wraps": [
+        "herding",
+        "roleplay",
+        "knowledge",
+        "mcp"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "plays",
+      "from": "player",
+      "to": "worldserver",
+      "label": "plays",
+      "variant": "emphasis",
+      "labelDy": 33
+    },
+    {
+      "id": "hooks",
+      "from": "worldserver",
+      "to": "bridge",
+      "label": "chat hooks, world tick",
+      "labelDy": 33
+    },
+    {
+      "id": "capture",
+      "from": "bridge",
+      "to": "seam",
+      "label": "captures chat",
+      "labelDy": 33,
+      "labelDx": 95
+    },
+    {
+      "id": "drain",
+      "from": "seam",
+      "to": "bridge",
+      "label": "orders, every 500 ms",
+      "labelDx": -120
+    },
+    {
+      "id": "reads-chat",
+      "from": "seam",
+      "to": "roleplay",
+      "label": "who said what",
+      "labelDy": 33,
+      "labelDx": 95
+    },
+    {
+      "id": "replies",
+      "from": "roleplay",
+      "to": "seam",
+      "label": "what to say and do",
+      "labelDx": -120
+    },
+    {
+      "id": "staging",
+      "from": "herding",
+      "to": "seam",
+      "label": "log in / log out"
+    },
+    {
+      "id": "console",
+      "from": "herding",
+      "to": "soap",
+      "label": "bot commands",
+      "variant": "security",
+      "labelDy": -70
+    },
+    {
+      "id": "gm",
+      "from": "soap",
+      "to": "worldserver",
+      "label": "drives the server",
+      "variant": "security"
+    },
+    {
+      "id": "grounding",
+      "from": "knowledge",
+      "to": "gamedb",
+      "label": "reads directly"
+    },
+    {
+      "id": "asks",
+      "from": "roleplay",
+      "to": "knowledge",
+      "label": "asks the archivist"
+    },
+    {
+      "id": "prompts",
+      "from": "roleplay",
+      "to": "models",
+      "label": "prompt + tool calls",
+      "variant": "emphasis",
+      "labelDy": 33
+    },
+    {
+      "id": "tools",
+      "from": "mcp",
+      "to": "knowledge",
+      "label": "22 tools"
+    },
+    {
+      "id": "client",
+      "from": "assistant",
+      "to": "mcp",
+      "label": "stdio"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Why a C++ module at all",
+      "items": [
+        "The core logs chat joins and leaves, never message bodies \u2014 there is no log to tail.",
+        "Every route out of the mod is leashed to 150 yards, so leading someone had to move inside."
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Grounded, deliberately",
+      "items": [
+        "A cheap archivist reads the tables; the companion never sees a raw row.",
+        "Quest progress, loot, zones and who is alive all come from the server's own data."
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "Runs without any of this",
+      "items": [
+        "APP_ENV=replay swaps every gateway for a recorded world in fixtures/.",
+        "No AzerothCore, no MySQL, no client, no API key."
+      ]
+    }
+  ]
+}

@@ -135,6 +135,9 @@ bin/console anm:smoke    # tests every link and names whichever one is wrong
 
 ## How it works
 
+**→ [docs/architecture.html](docs/architecture.html)** — the same picture, interactive and
+self-contained: light and dark, click any box to trace what it touches, export to PNG or SVG.
+
 ```
    WoW client
        |
