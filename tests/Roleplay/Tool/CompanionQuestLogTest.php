@@ -96,9 +96,9 @@ final class CompanionQuestLogTest extends TestCase
      *
      * @return array{id: int, title: string, level: int, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}
      */
-    private function quest(string $title, int $level, bool $complete = false, array $needs = []): array
+    private function quest(string $title, int $level, bool $complete = false, array $needs = [], ?string $where = null): array
     {
-        return ['id' => 1, 'title' => $title, 'level' => $level, 'complete' => $complete, 'needs' => $needs];
+        return ['id' => 1, 'title' => $title, 'level' => $level, 'where' => $where, 'complete' => $complete, 'needs' => $needs];
     }
 
     /**

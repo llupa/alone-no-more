@@ -38,13 +38,31 @@ final readonly class QuestLog implements QuestLogInterface
         private Connection $characters,
         #[Autowire(service: 'anm.world_connection')]
         private Connection $world,
+        private ?Dbc\AreaNames $areas = null,
     ) {
+    }
+
+    /**
+     * Where a quest belongs, which turns out to be free.
+     *
+     * `QuestSortID` is an AreaTable id when it is positive, and a QuestSort — a profession or a
+     * class — when it is negative. Positive is the case worth answering: it lets a companion say
+     * "your quests are in Redridge, nothing in Elwynn" from one look at the log, instead of
+     * asking the archives where each one is and taking a second a time about it.
+     */
+    private function zoneOf(int $questSortId): ?string
+    {
+        if ($questSortId <= 0 || null === $this->areas) {
+            return null;
+        }
+
+        return $this->areas->name($questSortId);
     }
 
     /**
      * Quests in a character's log, with progress against each requirement.
      *
-     * @return array<int, array{id: int, title: string, level: int, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}>
+     * @return array<int, array{id: int, title: string, level: int, where: string|null, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}>
      */
     public function activeFor(int $guid, int $limit = 25): array
     {
@@ -69,6 +87,7 @@ final readonly class QuestLog implements QuestLogInterface
                 'id' => (int) $row['quest'],
                 'title' => (string) $template['LogTitle'],
                 'level' => (int) $template['QuestLevel'],
+                'where' => $this->zoneOf((int) $template['QuestSortID']),
                 'complete' => self::STATUS_COMPLETE === (int) $row['status'],
                 'needs' => $this->progress($template, $row),
             ];
@@ -137,7 +156,7 @@ final readonly class QuestLog implements QuestLogInterface
     private function template(int $questId): ?array
     {
         $row = $this->world->fetchAssociative(
-            'SELECT LogTitle, QuestLevel,
+            'SELECT LogTitle, QuestLevel, QuestSortID,
                     RequiredItemId1, RequiredItemCount1, RequiredItemId2, RequiredItemCount2,
                     RequiredItemId3, RequiredItemCount3, RequiredItemId4, RequiredItemCount4,
                     RequiredNpcOrGo1, RequiredNpcOrGoCount1, RequiredNpcOrGo2, RequiredNpcOrGoCount2,

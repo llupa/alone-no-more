@@ -125,10 +125,11 @@ use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
 #[AsTool(
     name: 'sell_junk',
     description: <<<'TXT'
-        Sell your worthless things to a merchant. Use when the player tells you to sell, vendor
-        or get rid of grey or poor-quality items, or says your bags are full. You must be
-        standing at a merchant; if the answer says there is none, say so and name how far the
-        nearest one is rather than pretending. This never sells anything good — only grey.
+        Sell things to a merchant. Use when the player tells you to sell, vendor or get rid of
+        items, or says your bags are full. Pass "grey" for junk only, which is the safe default,
+        or "white" if they ask for white or common things too. Never anything better than that.
+        You must be standing at a merchant; if the answer says there is none, say so and name how
+        far the nearest one is rather than pretending.
         TXT,
     method: 'sellJunk',
 )]
@@ -479,8 +480,24 @@ final readonly class CompanionTools
      * merchant is looked up first and the honest answer given either way. Naming the nearest
      * one is more use to a player than a refusal.
      */
-    public function sellJunk(): string
+    public function sellJunk(string $quality = 'grey'): string
     {
+        // Only two are offered. Grey is junk by definition, and white is the next step a player
+        // actually asks for — "sell your white items" after a long afternoon. Green and above
+        // is gear somebody chose, and no sentence said in passing should be able to sell it.
+        $wanted = match (strtolower(trim($quality))) {
+            'grey', 'gray', 'poor', '' => ['word' => 'gray', 'rank' => 0],
+            'white', 'common', 'normal' => ['word' => 'white', 'rank' => 1],
+            default => null,
+        };
+
+        if (null === $wanted) {
+            return \sprintf(
+                'You will not sell %s things — only grey, or white if they ask. Say so.',
+                $quality,
+            );
+        }
+
         $bot = $this->context->bot();
 
         if (!$this->merchants->isOneAtHand($bot->position)) {
@@ -496,14 +513,14 @@ final readonly class CompanionTools
                 );
         }
 
-        $junk = $this->bags->noBetterThan($bot->guid);
+        $junk = $this->bags->noBetterThan($bot->guid, $wanted['rank']);
 
         if ([] === $junk) {
             return 'You have nothing worthless to sell. Say so.';
         }
 
         try {
-            $this->runner->run($bot->name, 's gray');
+            $this->runner->run($bot->name, 's '.$wanted['word']);
         } catch (WorldGatewayException $e) {
             return 'You could not: '.$e->getMessage();
         }
@@ -644,7 +661,7 @@ final readonly class CompanionTools
      * Progress is given as "two of six" rather than a bare count, because a companion saying
      * "four more" is the whole reason for reading this.
      *
-     * @param array<int, array{id: int, title: string, level: int, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}> $quests
+     * @param array<int, array{id: int, title: string, level: int, where: string|null, complete: bool, needs: array<int, array{what: string, have: int, need: int}>}> $quests
      */
     private function describeLog(array $quests, string $whenEmpty, string $lead): string
     {
@@ -677,9 +694,13 @@ final readonly class CompanionTools
                 $outstanding[] = \sprintf('%s %d of %d', $need['what'], $need['have'], $need['need']);
             }
 
+            // Where it belongs, when the quest data says. It answers "have we anything to do
+            // in Elwynn?" from the log itself, rather than asking the archives once per quest.
+            $where = null !== $quest['where'] ? \sprintf(' in %s', $quest['where']) : '';
+
             $lines[] = [] === $outstanding
-                ? \sprintf('"%s" (level %d)', $quest['title'], $quest['level'])
-                : \sprintf('"%s" (level %d), with %s', $quest['title'], $quest['level'], implode(' and ', $outstanding));
+                ? \sprintf('"%s" (level %d)%s', $quest['title'], $quest['level'], $where)
+                : \sprintf('"%s" (level %d)%s, with %s', $quest['title'], $quest['level'], $where, implode(' and ', $outstanding));
         }
 
         return $lead.': '.implode('; ', $lines).'.';

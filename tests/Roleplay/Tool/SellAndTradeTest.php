@@ -48,6 +48,37 @@ final class SellAndTradeTest extends TestCase
     }
 
     /**
+     * "Sell your white items" is a thing players say after a long afternoon, and it has to mean
+     * white rather than quietly meaning grey.
+     */
+    public function testItCanBeAskedForWhiteThingsToo(): void
+    {
+        $sent = [];
+        $world = $this->recording($sent);
+
+        $this->tools($world, $this->carrying([
+            ['entry' => 2512, 'name' => 'Rough Arrow', 'quality' => 1, 'count' => 200],
+        ]), $this->merchantAtHand())->sellJunk('white');
+
+        self::assertContains('playerbots exec Menelan !s white', $sent);
+    }
+
+    /**
+     * And nothing better. Green and above is gear somebody chose, and no sentence said in
+     * passing should be able to sell it.
+     */
+    public function testItRefusesToSellAnythingGood(): void
+    {
+        $sent = [];
+        $world = $this->recording($sent);
+
+        $answer = $this->tools($world, $this->carrying([]), $this->merchantAtHand())->sellJunk('green');
+
+        self::assertSame([], $sent);
+        self::assertStringContainsString('only grey', $answer);
+    }
+
+    /**
      * The mod's `sell` silently does nothing without a vendor in reach, which from out here is
      * indistinguishable from having sold. Naming the nearest one is more use than a refusal.
      */
