@@ -2,11 +2,11 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Alone No More \u2014 a PHP application standing beside a dead MMO",
+    "title": "Alone No More \u2014 a PHP application beside World of Warcraft",
     "quality_profile": "showcase",
     "viewBox": [
       1395,
-      770
+      760
     ]
   },
   "components": [
@@ -31,7 +31,7 @@
       "sublabel": "worldserver + mod-playerbots",
       "pos": [
         490,
-        166
+        152
       ],
       "size": [
         260,
@@ -45,7 +45,7 @@
       "sublabel": "our C++ module",
       "pos": [
         490,
-        296
+        268
       ],
       "size": [
         260,
@@ -60,7 +60,7 @@
       "sublabel": "GM account, port 7878",
       "pos": [
         150,
-        296
+        268
       ],
       "size": [
         220,
@@ -74,7 +74,7 @@
       "sublabel": "the seam, in the characters DB",
       "pos": [
         490,
-        426
+        384
       ],
       "size": [
         260,
@@ -88,7 +88,7 @@
       "sublabel": "the server's own tables",
       "pos": [
         850,
-        426
+        384
       ],
       "size": [
         220,
@@ -102,7 +102,7 @@
       "sublabel": "who should be awake, and where",
       "pos": [
         150,
-        556
+        500
       ],
       "size": [
         220,
@@ -116,7 +116,7 @@
       "sublabel": "who answers, and what they do",
       "pos": [
         490,
-        556
+        500
       ],
       "size": [
         260,
@@ -130,7 +130,7 @@
       "sublabel": "quests, loot, creatures, zones",
       "pos": [
         850,
-        556
+        500
       ],
       "size": [
         220,
@@ -144,7 +144,7 @@
       "sublabel": "companion + archivist",
       "pos": [
         490,
-        686
+        616
       ],
       "size": [
         260,
@@ -158,7 +158,7 @@
       "sublabel": "22 tools over stdio",
       "pos": [
         850,
-        686
+        616
       ],
       "size": [
         220,
@@ -172,7 +172,7 @@
       "sublabel": "Claude Code, Claude Desktop",
       "pos": [
         1108,
-        686
+        616
       ],
       "size": [
         200,
@@ -207,21 +207,21 @@
       "to": "worldserver",
       "label": "plays",
       "variant": "emphasis",
-      "labelDy": 33
+      "labelDy": 26
     },
     {
       "id": "hooks",
       "from": "worldserver",
       "to": "bridge",
       "label": "chat hooks, world tick",
-      "labelDy": 33
+      "labelDy": 26
     },
     {
       "id": "capture",
       "from": "bridge",
       "to": "seam",
       "label": "captures chat",
-      "labelDy": 33,
+      "labelDy": 26,
       "labelDx": 95
     },
     {
@@ -236,7 +236,7 @@
       "from": "seam",
       "to": "roleplay",
       "label": "who said what",
-      "labelDy": 33,
+      "labelDy": 26,
       "labelDx": 95
     },
     {
@@ -285,7 +285,7 @@
       "to": "models",
       "label": "prompt + tool calls",
       "variant": "emphasis",
-      "labelDy": 33
+      "labelDy": 26
     },
     {
       "id": "tools",
@@ -298,32 +298,6 @@
       "from": "assistant",
       "to": "mcp",
       "label": "stdio"
-    }
-  ],
-  "cards": [
-    {
-      "dot": "cyan",
-      "title": "Why a C++ module at all",
-      "items": [
-        "The core logs chat joins and leaves, never message bodies \u2014 there is no log to tail.",
-        "Every route out of the mod is leashed to 150 yards, so leading someone had to move inside."
-      ]
-    },
-    {
-      "dot": "emerald",
-      "title": "Grounded, deliberately",
-      "items": [
-        "A cheap archivist reads the tables; the companion never sees a raw row.",
-        "Quest progress, loot, zones and who is alive all come from the server's own data."
-      ]
-    },
-    {
-      "dot": "violet",
-      "title": "Runs without any of this",
-      "items": [
-        "APP_ENV=replay swaps every gateway for a recorded world in fixtures/.",
-        "No AzerothCore, no MySQL, no client, no API key."
-      ]
     }
   ]
 }
