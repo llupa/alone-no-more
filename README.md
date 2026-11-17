@@ -147,24 +147,14 @@ bin/console anm:smoke    # tests every link and names whichever one is wrong
 
 ## How it works
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/architecture-dark.png">
+  <img src="docs/architecture.png" alt="Alone No More — a PHP application beside World of Warcraft">
+</picture>
+
 **→ [docs/architecture.html](docs/architecture.html)** — the same picture, interactive and
 self-contained: light and dark, click any box to trace what it touches, export to PNG or SVG.
-
-```
-   WoW client
-       |
-  AzerothCore + mod-playerbots + mod-anm-bridge
-       |  chat events (anm_chat_event)        orders (anm_outbox)
-       v                                           ^
-  ┌─────────────────────────────────────────────────────┐
-  │  Alone No More (PHP)                                │
-  │                                                     │
-  │   Herding ──── who should be here, and where        │
-  │   Roleplay ─── who answers, and what they know      │
-  │   Knowledge ── the server's own quest and loot data │
-  │   MCP ──────── all of it, to any assistant          │
-  └─────────────────────────────────────────────────────┘
-```
+GitHub serves HTML as source rather than rendering it, so download the file and open it locally.
 
 **`mod-anm-bridge`** is a small C++ module we wrote, for the things that cannot be done from
 outside the worldserver at all: capturing chat, making a bot say arbitrary text, logging bots in
