@@ -38,12 +38,19 @@ snapshot of a real session** is committed, and the whole application runs agains
 ```bash
 git clone <this repo> && cd alone-no-more
 composer install
-APP_ENV=replay bin/console anm:world Doppel
+APP_ENV=replay bin/console anm:world Klemprime
 ```
 
-Everything in `fixtures/` was captured from a live server with `bin/console anm:snapshot`. None of
-it is written by hand — inventing game data is exactly the confident fiction this project exists
-to avoid.
+Everything in `fixtures/` was captured from a live server with `bin/console anm:snapshot`: a real
+session in Redridge, with the quests that character actually held and the conversation that
+actually happened. None of it is invented — making up game data is exactly the confident fiction
+this project exists to avoid.
+
+One seam worth naming: companions' party replies are added from the listener's own log rather
+than captured with the rest. `mod-anm-bridge` reads chat through `OnPlayerCanUseChat`, and party
+messages it sends itself are broadcast as packets that never pass that hook — so the table holds
+only the player's half. Every line is a real thing a companion said; it simply reached the
+fixture by a different road.
 
 ### Point an assistant at it
 
@@ -65,7 +72,8 @@ In Claude Desktop's `claude_desktop_config.json`:
 }
 ```
 
-Then ask it *"where is Doppel and what are they working on?"* or *"what is alive near them?"*.
+Then ask it *"where is Klemprime and what are they working on?"*, *"what is alive near them?"*, or
+*"what has the world been saying?"*.
 Drop `APP_ENV` once you have a real server and the same tools drive it.
 
 ---
@@ -181,7 +189,7 @@ vendor/bin/phpstan analyse                    # level 8, src and tests
 vendor/bin/deptrac analyse                    # layers may depend downward only
 bin/console lint:container                    # DI must stay green
 vendor/bin/php-cs-fixer fix                   # @Symfony ruleset
-bin/console anm:snapshot Doppel               # recapture the replay fixture
+bin/console anm:snapshot Klemprime            # recapture the replay fixture
 ```
 
 The thirteen that skip read `AreaTable.dbc` and `WorldMapArea.dbc`, which ship with the game

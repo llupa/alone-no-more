@@ -76,10 +76,10 @@ final class ReplayWorldTest extends TestCase
 
     public function testACharacterIsDescribedFromTheSnapshot(): void
     {
-        $state = $this->inspector()->playerState('Doppel');
+        $state = $this->inspector()->playerState('Klemprime');
 
-        self::assertStringContainsString('Doppel is a level', $state);
-        self::assertStringContainsString('Teldrassil', $state, 'zone names must survive having no client data');
+        self::assertStringContainsString('Klemprime is a level', $state);
+        self::assertStringContainsString('Redridge Mountains', $state, 'zone names must survive having no client data');
     }
 
     public function testAnUnknownCharacterIsReportedRatherThanInvented(): void
@@ -89,7 +89,7 @@ final class ReplayWorldTest extends TestCase
 
     public function testNearbyActorsAndLivingCreaturesComeFromTheSnapshot(): void
     {
-        $nearby = $this->inspector()->nearbyActors('Doppel', 120);
+        $nearby = $this->inspector()->nearbyActors('Klemprime', 120);
 
         self::assertStringContainsString('Within 120 yards', $nearby);
         self::assertStringContainsString('Creatures alive nearby', $nearby);
@@ -97,7 +97,7 @@ final class ReplayWorldTest extends TestCase
 
     public function testThePopulationOfEachZoneIsCounted(): void
     {
-        self::assertStringContainsString('Teldrassil', $this->inspector()->zonePopulation());
+        self::assertStringContainsString('Redridge Mountains', $this->inspector()->zonePopulation());
     }
 
     public function testTheRecordedConversationIsReadable(): void
@@ -114,10 +114,10 @@ final class ReplayWorldTest extends TestCase
      */
     public function testTheArchiveAnswersFromTheSnapshot(): void
     {
-        $quests = (new ReplayKnowledge($this->snapshot()))->findQuestsByName('Crown of the Earth');
+        $quests = (new ReplayKnowledge($this->snapshot()))->findQuestsByName('Dry Times');
 
         self::assertNotEmpty($quests);
-        self::assertSame('Crown of the Earth', $quests[0]['title']);
+        self::assertSame('Dry Times', $quests[0]['title']);
     }
 
     /**

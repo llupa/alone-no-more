@@ -90,6 +90,6 @@ final class AreaNamesTest extends TestCase
             self::markTestSkipped('No captured areas fixture.');
         }
 
-        self::assertSame('Teldrassil', (new AreaNames('/nonexistent/dbc', null, $fixture))->name(141));
+        self::assertSame('Redridge Mountains', (new AreaNames('/nonexistent/dbc', null, $fixture))->name(44));
     }
 }
