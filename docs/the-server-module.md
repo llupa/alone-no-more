@@ -95,7 +95,21 @@ Cities are refused rather than attempted. The mesh there has doors, lifts and st
 and a companion that cannot get out of Stormwind should say so rather than stand still
 apologising.
 
-## 6. Milestones
+## 6. Recording what it says itself
+
+Chat reaches `anm_chat_event` through `OnPlayerCanUseChat`, which fires when a *player* speaks.
+Say, yell and whisper from a bot go through the normal chat path and are caught by it. A party
+or guild message is not: the module builds a packet and broadcasts it to the group, which never
+passes the hook.
+
+The consequence was invisible until a session was captured and read back: every question the
+player asked was there, and not one reply. Forty-five minutes of a man apparently talking to
+himself.
+
+So those two channels are recorded here, deliberately *after* the broadcast, so that what is
+written down is what was actually delivered rather than what was intended.
+
+## 7. Milestones
 
 `OnPlayerLevelChanged` and `OnPlayerAchievementComplete` write to `anm_milestone` as they
 happen. Polling cannot do this: two levels in one tick would look like one, and an achievement's

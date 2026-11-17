@@ -591,6 +591,19 @@ void AnmBridge::DrainOutbox()
             WorldPacket data;
             ChatHandler::BuildChatPacket(data, CHAT_MSG_PARTY, LANG_UNIVERSAL, bot, nullptr, message);
             group->BroadcastPacket(&data, false);
+
+            // Record it ourselves, because nothing else will.
+            //
+            // Chat reaches `anm_chat_event` through `OnPlayerCanUseChat`, which fires when a
+            // *player* speaks. A packet broadcast to a group never passes it, so a companion's
+            // party replies were invisible to everything downstream: the archive of what the
+            // world has been saying held every question a player asked and not one answer.
+            // Found when a captured session read as a man talking to himself for forty-five
+            // minutes.
+            //
+            // After the broadcast rather than before, so what is written down is what was
+            // actually delivered.
+            RecordChat(bot, CHAT_MSG_PARTY, LANG_UNIVERSAL, message, ObjectGuid::Empty, "");
         }
         else if (action == "guild")
         {
@@ -601,6 +614,10 @@ void AnmBridge::DrainOutbox()
                 continue;
             }
             guild->BroadcastToGuild(bot->GetSession(), false, message, LANG_UNIVERSAL);
+
+            // Same reasoning as the party branch: a guild broadcast is not player chat and the
+            // hook never sees it.
+            RecordChat(bot, CHAT_MSG_GUILD, LANG_UNIVERSAL, message, ObjectGuid::Empty, "");
         }
         else
         {
