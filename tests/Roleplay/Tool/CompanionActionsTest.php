@@ -155,6 +155,36 @@ final class CompanionActionsTest extends TestCase
         self::assertStringContainsString('do not know how', $this->tools($world)->doThis('follow; destroy'));
     }
 
+    /**
+     * A recording has no server to carry an order out, and the replay answers one with a polite
+     * "not run" — which do_this used to read as success and announce as done. Every action now
+     * refuses before anything is attempted, and says why.
+     */
+    public function testInARecordedWorldEveryOrderIsRefusedAndNothingIsSent(): void
+    {
+        $world = $this->createMock(WorldGatewayInterface::class);
+        $world->method('recordedAt')->willReturn(new \DateTimeImmutable('2026-11-17 20:48:28'));
+        $world->expects(self::never())->method('execute');
+
+        $tools = $this->tools($world);
+
+        $answers = [
+            'do_this' => $tools->doThis('follow'),
+            'attack_something' => $tools->attackSomething('kobold'),
+            'lead_the_way' => $tools->leadTheWay('Deputy Willem'),
+            'keep_fighting' => $tools->keepFighting('kobold'),
+            'stop_fighting' => $tools->stopFighting(),
+            'sell_junk' => $tools->sellJunk(),
+            'hand_over' => $tools->handOver('Feeble Sword'),
+            'wear_this' => $tools->wearThis('Feeble Sword'),
+        ];
+
+        foreach ($answers as $tool => $answer) {
+            self::assertStringContainsString('recording', $answer, $tool);
+            self::assertStringNotContainsString('Done', $answer, $tool);
+        }
+    }
+
     private function tools(WorldGatewayInterface $world, ?BagsInterface $bags = null): CompanionTools
     {
         $context = new BotCommandContext();
@@ -170,11 +200,12 @@ final class CompanionActionsTest extends TestCase
             $this->createStub(MerchantsInterface::class),
             $this->createStub(GameKnowledgeInterface::class),
             $this->createStub(LevelProgressInterface::class),
-            new BotSpeechDispatcher($this->createStub(Connection::class)),
+            new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))),
             new ErrandBook(),
             new Journeys($world, $runner, new LeadOrders(new Outbox($this->createStub(Connection::class)))),
             new LeadOrders(new Outbox($this->createStub(Connection::class))),
             new ZoneBounds('/nonexistent'),
+            $world,
         );
     }
 }

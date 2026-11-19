@@ -27,7 +27,7 @@ final class PartyVoice
     private ?Connection $connection = null;
 
     public function __construct(
-        #[Autowire('%kernel.project_dir%/var/anm.sqlite')]
+        #[Autowire('%anm.state_file%')]
         private readonly string $path,
     ) {
     }

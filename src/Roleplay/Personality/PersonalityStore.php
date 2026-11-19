@@ -29,7 +29,7 @@ final class PersonalityStore
 
     public function __construct(
         private readonly PersonalityRoller $roller,
-        #[Autowire('%kernel.project_dir%/var/anm.sqlite')]
+        #[Autowire('%anm.state_file%')]
         private readonly string $path,
     ) {
     }

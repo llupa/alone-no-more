@@ -10,6 +10,7 @@ use App\Roleplay\Errand\ErrandBook;
 use App\Roleplay\Errand\ErrandRunner;
 use App\Tests\Roleplay\ActorMother;
 use App\World\Chat\BotSpeechDispatcher;
+use App\World\Outbox;
 use App\World\WorldGatewayInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -41,7 +42,7 @@ final class ErrandRunnerTest extends TestCase
 
         return new ErrandRunner(
             $book,
-            new BotSpeechDispatcher($connection ?? $this->createStub(Connection::class)),
+            new BotSpeechDispatcher(new Outbox($connection ?? $this->createStub(Connection::class))),
             $log,
             $world,
             swingSeconds: 0,
@@ -135,7 +136,7 @@ final class ErrandRunnerTest extends TestCase
         $log = $this->createStub(QuestLogInterface::class);
         $log->method('activeFor')->willReturn([]);
 
-        $runner = new ErrandRunner($book, new BotSpeechDispatcher($connection), $log, $world, swingSeconds: 60);
+        $runner = new ErrandRunner($book, new BotSpeechDispatcher(new Outbox($connection)), $log, $world, swingSeconds: 60);
         $runner->tick();
         $runner->tick();
     }
@@ -150,7 +151,7 @@ final class ErrandRunnerTest extends TestCase
         $log = $this->createStub(QuestLogInterface::class);
         $log->method('activeFor')->willReturn([]);
 
-        (new ErrandRunner($book, new BotSpeechDispatcher($this->createStub(Connection::class)), $log, $world))->tick();
+        (new ErrandRunner($book, new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))), $log, $world))->tick();
 
         self::assertTrue($book->isEmpty());
     }
@@ -178,7 +179,7 @@ final class ErrandRunnerTest extends TestCase
                 : [$this->quest(9, 'Brotherhood of Thieves', complete: true, have: 8)],
         );
 
-        $finished = (new ErrandRunner($book, new BotSpeechDispatcher($this->createStub(Connection::class)), $log, $world, swingSeconds: 0))->tick();
+        $finished = (new ErrandRunner($book, new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))), $log, $world, swingSeconds: 0))->tick();
 
         self::assertSame([], $finished, 'the errand must outlive the companion finishing its own copy');
         self::assertNotNull($book->of(self::BOT));

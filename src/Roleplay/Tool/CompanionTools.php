@@ -20,6 +20,7 @@ use App\Roleplay\Travel\LeadOrders;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\Exception\WorldGatewayException;
 use App\World\Model\Position;
+use App\World\WorldGatewayInterface;
 use Symfony\AI\Agent\Toolbox\Attribute\AsTool;
 
 /**
@@ -206,6 +207,7 @@ final readonly class CompanionTools
         private Journeys $journeys,
         private LeadOrders $leads,
         private ZoneBounds $zones,
+        private WorldGatewayInterface $world,
     ) {
     }
 
@@ -214,6 +216,10 @@ final readonly class CompanionTools
      */
     public function doThis(string $command): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $command = strtolower(trim($command));
 
         // A model will occasionally invent a plausible-sounding verb, and the honest answer is
@@ -243,6 +249,10 @@ final readonly class CompanionTools
      */
     public function attackSomething(string $what = ''): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $bot = $this->context->bot();
 
         // Chasing something is not walking somewhere.
@@ -273,6 +283,10 @@ final readonly class CompanionTools
      */
     public function leadTheWay(string $who): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $bot = $this->context->bot();
         $found = $this->knowledge->findCreatures($who, 1);
 
@@ -384,6 +398,10 @@ final readonly class CompanionTools
      */
     public function keepFighting(string $what = '', string $forQuest = '', bool $forPlayer = false): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $bot = $this->context->bot();
         $owner = $forPlayer ? $this->context->speaker() : $bot;
 
@@ -427,6 +445,23 @@ final readonly class CompanionTools
      * being told to stop, or one that announces arriving somewhere it was never sent.
      */
     /**
+     * Why no order can be carried out, when the world is a recording; null when it is live.
+     *
+     * Checked first by every tool that changes something. A recording has no server to carry an
+     * order out, and an order sent to one comes back as "not run" — which a tool reading only
+     * whether it threw would announce as done. Better to say so before anything is attempted.
+     */
+    private function nothingCanHappen(): ?string
+    {
+        if (null === $this->world->recordedAt()) {
+            return null;
+        }
+
+        return 'This world is a recording: nothing in it can be changed, so you cannot do that here. '
+            .'Say so plainly, in character, and offer what you can do instead — talk, or look something up.';
+    }
+
+    /**
      * End a walk before the order that replaces it.
      *
      * Waited on when there is a walk to end. The new order goes straight to the server while
@@ -443,6 +478,10 @@ final readonly class CompanionTools
 
     public function stopFighting(): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $bot = $this->context->bot();
         $this->errands->finish($bot->guid);
         $this->stopWalking($bot->guid);
@@ -492,6 +531,10 @@ final readonly class CompanionTools
      */
     public function sellJunk(string $quality = 'grey'): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         // Only two are offered. Grey is junk by definition, and white is the next step a player
         // actually asks for — "sell your white items" after a long afternoon. Green and above
         // is gear somebody chose, and no sentence said in passing should be able to sell it.
@@ -556,6 +599,10 @@ final readonly class CompanionTools
      */
     public function handOver(string $item): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $item = trim($item);
 
         if (1 !== preg_match("/^[A-Za-z0-9 '\\-]{2,40}$/", $item)) {
@@ -584,6 +631,10 @@ final readonly class CompanionTools
 
     public function wearThis(string $item): string
     {
+        if (null !== $refusal = $this->nothingCanHappen()) {
+            return $refusal;
+        }
+
         $item = trim($item);
 
         // A name is a short line of ordinary words. This no longer guards the console — the

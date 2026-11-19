@@ -90,11 +90,12 @@ final class CheckExperienceTest extends TestCase
             $this->createStub(MerchantsInterface::class),
             $this->createStub(GameKnowledgeInterface::class),
             $levels,
-            new BotSpeechDispatcher($this->createStub(Connection::class)),
+            new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))),
             new ErrandBook(),
             new Journeys($world, $runner, new LeadOrders(new Outbox($this->createStub(Connection::class)))),
             new LeadOrders(new Outbox($this->createStub(Connection::class))),
             new ZoneBounds('/nonexistent'),
+            $world,
         );
     }
 }

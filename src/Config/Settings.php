@@ -42,7 +42,7 @@ final class Settings
     private ?Connection $connection = null;
 
     public function __construct(
-        #[Autowire('%kernel.project_dir%/var/anm.sqlite')]
+        #[Autowire('%anm.state_file%')]
         private readonly string $path,
         #[Autowire(env: 'int:ANM_HERD_TARGET')]
         private readonly int $defaultCrowdSize = 50,

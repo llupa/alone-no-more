@@ -335,11 +335,12 @@ final class LeadTheWayTest extends TestCase
             $this->createStub(MerchantsInterface::class),
             $knowledge,
             $this->createStub(LevelProgressInterface::class),
-            new BotSpeechDispatcher($this->createStub(Connection::class)),
+            new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))),
             new ErrandBook(),
             $journeys ?? new Journeys($world, new PlayerbotCommandRunner($world), new LeadOrders(new Outbox($connection))),
             new LeadOrders(new Outbox($connection)),
             new ZoneBounds('/nonexistent'),
+            $world,
         );
     }
 }

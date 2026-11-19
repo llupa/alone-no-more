@@ -7,6 +7,9 @@
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    # Our own state — settings, companion memory, personalities, who is set aside for whom. Kept
+    # apart from AzerothCore's databases: the server knows nothing about it.
+    anm.state_file: '%kernel.project_dir%/var/anm.sqlite'
 
 services:
     # default configuration for services in *this* file
@@ -47,3 +50,9 @@ when@replay:
         App\Knowledge\LevelProgressInterface: '@App\Replay\ReplayLevelProgress'
         App\Knowledge\BagsInterface: '@App\Replay\ReplayBags'
         App\Herding\BotStagerInterface: '@App\Replay\ReplayStager'
+        App\World\OutboxInterface: '@App\Replay\ReplayOutbox'
+
+    parameters:
+        # A recording keeps its own state. Talking to a companion in replay writes memories, and
+        # in the live file they would be remembered in the game as things that were said there.
+        anm.state_file: '%kernel.project_dir%/var/replay.sqlite'

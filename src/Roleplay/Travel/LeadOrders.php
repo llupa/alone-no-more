@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Roleplay\Travel;
 
 use App\World\Model\Position;
-use App\World\Outbox;
+use App\World\OutboxInterface;
 
 /**
  * Tells a companion where to walk, by asking the worldserver rather than the bot.
@@ -26,7 +26,7 @@ use App\World\Outbox;
  */
 final readonly class LeadOrders
 {
-    public function __construct(private Outbox $outbox)
+    public function __construct(private OutboxInterface $outbox)
     {
     }
 

@@ -192,11 +192,12 @@ final class SellAndTradeTest extends TestCase
             $merchants,
             $this->createStub(GameKnowledgeInterface::class),
             $this->createStub(LevelProgressInterface::class),
-            new BotSpeechDispatcher($this->createStub(Connection::class)),
+            new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))),
             new ErrandBook(),
             new Journeys($world, $runner, new LeadOrders(new Outbox($this->createStub(Connection::class)))),
             new LeadOrders(new Outbox($this->createStub(Connection::class))),
             new ZoneBounds('/nonexistent'),
+            $world,
         );
     }
 }

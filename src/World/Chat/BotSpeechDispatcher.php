@@ -6,9 +6,7 @@ namespace App\World\Chat;
 
 use App\World\Exception\WorldGatewayException;
 use App\World\Model\ChatChannel;
-use App\World\Outbox;
-use Doctrine\DBAL\Connection;
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use App\World\OutboxInterface;
 
 /**
  * Makes a bot speak, by queueing a row in `anm_outbox` for mod-anm-bridge to dispatch on the
@@ -21,15 +19,9 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final readonly class BotSpeechDispatcher
 {
-    private Outbox $outbox;
-
     public function __construct(
-        #[Autowire(service: 'anm.characters_connection')]
-        private Connection $connection,
+        private OutboxInterface $outbox,
     ) {
-        // The queue itself is shared with anything else that has to reach into the worldserver;
-        // the constructor still takes a connection so that callers and tests are unchanged.
-        $this->outbox = new Outbox($connection);
     }
 
     /**

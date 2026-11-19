@@ -11,6 +11,7 @@ use App\Tests\Roleplay\ActorMother;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\GroupRepositoryInterface;
 use App\World\Model\Position;
+use App\World\Outbox;
 use App\World\WorldGatewayInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -52,7 +53,7 @@ final class CompanionsOnCallTest extends TestCase
             $this->requestsFor(),
             $world,
             new BotRoster($this->createStub(Connection::class)),
-            new BotSpeechDispatcher($outbox),
+            new BotSpeechDispatcher(new Outbox($outbox)),
             $this->createStub(GroupRepositoryInterface::class),
         );
 
@@ -80,7 +81,7 @@ final class CompanionsOnCallTest extends TestCase
             $this->requestsFor(),
             $world,
             new BotRoster($this->createStub(Connection::class)),
-            new BotSpeechDispatcher($outbox),
+            new BotSpeechDispatcher(new Outbox($outbox)),
             $this->createStub(GroupRepositoryInterface::class),
         );
 
@@ -109,7 +110,7 @@ final class CompanionsOnCallTest extends TestCase
             $this->requestsFor(),
             $world,
             new BotRoster($this->createStub(Connection::class)),
-            new BotSpeechDispatcher($outbox),
+            new BotSpeechDispatcher(new Outbox($outbox)),
             $this->createStub(GroupRepositoryInterface::class),
         );
 
@@ -145,7 +146,7 @@ final class CompanionsOnCallTest extends TestCase
             $this->requestsFor(),
             $world,
             new BotRoster($this->createStub(Connection::class)),
-            new BotSpeechDispatcher($outbox),
+            new BotSpeechDispatcher(new Outbox($outbox)),
             $groups,
         );
 
@@ -172,7 +173,7 @@ final class CompanionsOnCallTest extends TestCase
             $this->requestsFor(),
             $world,
             new BotRoster($this->createStub(Connection::class)),
-            new BotSpeechDispatcher($outbox),
+            new BotSpeechDispatcher(new Outbox($outbox)),
             $this->createStub(GroupRepositoryInterface::class),
         );
 

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\World;
 
 use Doctrine\DBAL\Connection;
+use Symfony\Component\DependencyInjection\Attribute\AsAlias;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 
 /**
@@ -14,7 +15,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * PHP process cannot touch one. Speech was the first such thing; leading a companion somewhere
  * is the second. Both are the same mechanism, so it lives here rather than twice.
  */
-final readonly class Outbox
+#[AsAlias(OutboxInterface::class)]
+final readonly class Outbox implements OutboxInterface
 {
     public function __construct(
         #[Autowire(service: 'anm.characters_connection')]

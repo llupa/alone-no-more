@@ -129,11 +129,12 @@ final class CompanionQuestLogTest extends TestCase
             $this->createStub(MerchantsInterface::class),
             $knowledge,
             $this->createStub(LevelProgressInterface::class),
-            new BotSpeechDispatcher($this->createStub(Connection::class)),
+            new BotSpeechDispatcher(new Outbox($this->createStub(Connection::class))),
             new ErrandBook(),
             new Journeys($this->createStub(WorldGatewayInterface::class), $runner, new LeadOrders(new Outbox($this->createStub(Connection::class)))),
             new LeadOrders(new Outbox($this->createStub(Connection::class))),
             new ZoneBounds('/nonexistent'),
+            $this->createStub(WorldGatewayInterface::class),
         );
     }
 }

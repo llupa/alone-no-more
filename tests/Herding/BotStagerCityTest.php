@@ -13,6 +13,7 @@ use App\Tests\Roleplay\ActorMother;
 use App\World\Chat\BotSpeechDispatcher;
 use App\World\GroupRepositoryInterface;
 use App\World\Model\Position;
+use App\World\Outbox;
 use App\World\WorldGatewayInterface;
 use Doctrine\DBAL\Connection;
 use PHPUnit\Framework\Attributes\CoversClass;
@@ -76,7 +77,7 @@ final class BotStagerCityTest extends TestCase
         $stager = new BotStager(
             new BotRoster($characters),
             new PlacementPoints($world),
-            new BotSpeechDispatcher($characters),
+            new BotSpeechDispatcher(new Outbox($characters)),
             $this->createStub(GroupRepositoryInterface::class),
             new AreaNames('/nonexistent'),
             $this->createStub(WorldGatewayInterface::class),
