@@ -30,10 +30,11 @@ Built for the Symfony AI & MCP Hackathon, on Symfony 8.1 and PHP 8.5.
 
 ---
 
-## Try it in two minutes, with no game at all
+## For judges: try it in two minutes, with no game at all
 
-You do not need AzerothCore, MySQL, a C++ toolchain or a copy of a 2008 game client. A **captured
-snapshot of a real session** is committed, and the whole application runs against it:
+You do not need AzerothCore, MySQL, a C++ toolchain, a copy of a 2008 game client or an API key.
+A **recording of a real play session** is committed, and the whole application runs against it —
+the same code, the same MCP tools, with only the source of the data swapped:
 
 ```bash
 git clone <this repo> && cd alone-no-more
@@ -41,10 +42,33 @@ composer install
 APP_ENV=replay bin/console anm:world Klemprime
 ```
 
-Everything in `fixtures/` was captured from a live server with `bin/console anm:snapshot`: a real
-session in Redridge, with the quests that character actually held and the conversation that
-actually happened. None of it is invented — making up game data is exactly the confident fiction
-this project exists to avoid.
+What you get back:
+
+```
+Klemprime — a male Human warrior of the Alliance, level 14
+==========================================================
+
+ ! [NOTE] A recording of a real session in Redridge Mountains, captured 17 November 2026.
+ !        No game server is running.
+
+Within 150yd: 8
+---------------
+  name       who                faction    lvl   peer?   distance
+  Anduril    Night Elf Priest   Alliance   13    yes     1 yd
+  Ibykick    Gnome Warlock      Alliance   15    yes     106 yd
+  Bolgew     Tauren Warrior     Horde      19    yes     108 yd
+  …
+```
+
+Klemprime is the player; Anduril, one yard away, is the AI companion in his party; the rest are
+the crowd the app keeps around him so the world feels lived in.
+
+**What the recording is.** `fixtures/world.json`, captured from a live server with
+`bin/console anm:snapshot` at the end of a session in Redridge: 38 characters and the party, 22
+quest logs, 84 lines of the conversation between the player and his companions, and the 100
+quests, 91 items and 159 loot entries from the server's own database that the session touched.
+None of it is invented — making up game data is exactly the confident fiction this project
+exists to avoid.
 
 One seam worth naming, because this fixture predates its fix: the companions' party replies in
 it were taken from the listener's own log rather than captured with everything else.
@@ -57,6 +81,8 @@ The module records its own party and guild speech now, after delivering it, so t
 needs no such help.
 
 ### Point an assistant at it
+
+This is the part worth trying. Run the MCP server against the recording:
 
 ```bash
 APP_ENV=replay bin/console mcp:server     # speaks MCP over stdio
@@ -76,8 +102,32 @@ In Claude Desktop's `claude_desktop_config.json`:
 }
 ```
 
-Then ask it *"where is Klemprime and what are they working on?"*, *"what is alive near them?"*, or
-*"what has the world been saying?"*.
+Then ask, in plain words. Every answer below is what the recording actually returns:
+
+| Ask | Tool it reaches | What comes back |
+|---|---|---|
+| *"Where is Klemprime and what is he working on?"* | `world_player_state` | Level 14 warrior in Redridge, in a party with Anduril, and his quest log with progress — "Dry Times" still needs a Bottle of Moonshine |
+| *"What should Klemprime do next?"* | `what_to_do_next` | Four quests ready to hand in, and what the others still need |
+| *"What has the party been saying?"* | `recent_chat` | The recorded conversation, both halves of it |
+| *"What is Dry Times?"* | `look_up_quest` | Barkeep Daniels of Lakeshire, and the four drinks he wants |
+| *"Where do Underbelly Whelp Scales come from?"* | `where_to_get` | Black Dragon Whelps and Snarlflare, about 80% of the time |
+| *"Who is around Klemprime?"* | `world_nearby_actors` | The eight characters within 150 yards, players and bots |
+
+### What replay will not do
+
+- **Change anything.** There is no server, so orders are refused and say so: `bot_command`
+  answers *"This is a recorded world, so … was not run."* The recording was captured just after
+  the session ended, so Klemprime is offline, and `summon_crowd` says there is nowhere to gather
+  anyone. A demo that faked "brought in 19" would misrepresent the project it demonstrates.
+- **Know the whole game.** Lookups know what the session touched — Redridge's quests, items,
+  creatures and loot — not all of Azeroth. Ask about something elsewhere and the answer is that
+  it is not in the records, rather than an invented one.
+- **Talk.** Companions answering in character needs a live server for them to speak in, and a
+  model. The conversation they had is what `recent_chat` shows.
+
+The settings tools (`configure_world`, `set_herding`, `follow_character`) do work: they write to
+a local file under `var/`. With no listener running, nothing acts on what they set.
+
 Drop `APP_ENV` once you have a real server and the same tools drive it.
 
 ---
