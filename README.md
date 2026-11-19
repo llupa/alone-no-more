@@ -109,3 +109,67 @@ arguments and options: [docs/development.md](docs/development.md#commands).
 | [The server module](docs/the-server-module.md) | The C++ inside the worldserver, and why it has to be there |
 | [Development](docs/development.md) | Tests, static analysis, layers, and every command |
 | [Architecture](docs/architecture.html) | The interactive diagram — download and open locally |
+
+## All features
+
+**The crowd**
+- About 50 bots kept within 600 yards of you, within 5 levels of yours and of your faction —
+  every number adjustable, by an assistant over MCP or in `.env`.
+- In the ten capitals and sanctuaries — Stormwind, Ironforge, Darnassus, The Exodar, Orgrimmar,
+  Thunder Bluff, Undercity, Silvermoon, Shattrath and Dalaran — 50 more, packed closer.
+- Bots log in where they belong, never in front of you, and go dormant rather than being thrown
+  away, ready for wherever you turn up next.
+- A zone change has to last a minute before the crowd moves, so riding along a border or stepping
+  into a cave does not tear the world down.
+- Anyone who spoke to you in the last ten minutes is never sent away mid-conversation.
+
+**Companions who talk**
+- In character, answering on the channel you used: party, say, whisper, guild or officer.
+- Grounded in the server's own data: the creatures and people around them, the quests people
+  nearby talk about, your quest log and theirs, what drops where. Nothing else is named.
+- Two models: Claude Sonnet as the companion, Claude Haiku as the archivist it asks about quests,
+  items, creatures and loot. Or Ollama, locally, for free.
+- Quest and item links you shift-click into chat are understood.
+- Each bot has a personality, rolled once and kept: creed, culture, humour, manner, pride and
+  warmth.
+- Memory in three layers: the conversation itself, what they overheard from the rest of the party,
+  and a record that survives restarts.
+- One voice per party, so the whole group does not answer at once.
+- Honest when they cannot help. Raw tool output never reaches your chat window, and a long answer
+  ends on a finished sentence.
+
+**Companions who act, in plain English**
+- **Lead the way** to any NPC, past mod-playerbots' 150-yard leash, fighting what gets in the way
+  and carrying on. They decline inside capitals, where the server's pathfinding cannot cope.
+- **Keep fighting** until the quest objective is complete, as counted by the server.
+- **Attack** something you name, without you having to target it.
+- **Sell the junk** at a merchant, grey or white items.
+- **Hand over** an item, or **put on** one from their bags.
+- **Check** their quest log, your quest log, their bags and their experience.
+- Any other mod-playerbots order — follow, stay, flee and the rest — checked against the mod's own
+  vocabulary first.
+
+**The world notices you**
+- Now and then — every 30 minutes by default — someone nearby mutters something.
+- Levels and achievements are congratulated — by your companion in party chat, or by whoever is
+  standing nearest.
+- A companion asked for in advance is waiting, online, when you log in, is never sent away, and is
+  brought back if they wander off.
+
+**From an assistant, over MCP**
+- 22 tools: 13 that only look, 9 that change the world, annotated so a client can tell them apart.
+- No dashboard: crowd size, level range, whose zone to follow, herding on or off — all by asking.
+- Stdio only; the unauthenticated HTTP transport is switched off.
+
+**Inside the server: `mod-anm-bridge`**
+- Chat capture on every channel, with addon traffic left out.
+- Bots saying any text on any channel, logging in and out, attacking a named target, and walking
+  further than the mod allows.
+- Level-ups and achievements recorded as they happen.
+
+**Trying it and building it**
+- Replay: the whole application, MCP included, against a recorded real session — no server, no
+  database, no game client.
+- `anm:talk` to talk to companions from the terminal, `anm:prompt` to see exactly what grounds one,
+  `anm:smoke` to find a broken link to the server, `anm:snapshot` to record a new session.
+- PHPStan level 8, layers enforced by deptrac, and agents tested with Symfony AI's `MockAgent`.
