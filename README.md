@@ -109,3 +109,8 @@ arguments and options: [docs/development.md](docs/development.md#commands).
 | [The server module](docs/the-server-module.md) | The C++ inside the worldserver, and why it has to be there |
 | [Development](docs/development.md) | Tests, static analysis, layers, and every command |
 | [Architecture](docs/architecture.html) | The interactive diagram — download and open locally |
+
+## Thanks
+
+To **Javier** and **Klement**, who listened when this was only an idea and told me it was worth
+building, and who sat through the hallway tests that shaped what you see here.
