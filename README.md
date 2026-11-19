@@ -72,10 +72,18 @@ game server, no database, no game client:
 ```bash
 git clone <this repo> && cd alone-no-more && composer install
 
-APP_ENV=replay bin/console anm:world Klemprime            # the recorded world
-APP_ENV=replay bin/console anm:prompt Anduril Klemprime   # what grounds a companion
-APP_ENV=replay bin/console anm:talk Klemprime             # talk to him — Claude or Ollama
+# anm:world <character>           who is around the player, in the recorded world
+APP_ENV=replay bin/console anm:world Klemprime
+
+# anm:prompt <companion> <player>  everything a companion answers from, when the player speaks
+APP_ENV=replay bin/console anm:prompt Anduril Klemprime
+
+# anm:talk <player>                talk to your companions as the player — Claude or Ollama
+APP_ENV=replay bin/console anm:talk Klemprime
 ```
+
+Klemprime is the player in the recording, and Anduril is his companion. Every command, with its
+arguments and options: [docs/development.md](docs/development.md#commands).
 
 | | You need | Guide |
 |---|---|---|
