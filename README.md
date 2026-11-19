@@ -8,8 +8,7 @@
 > not affiliated with, endorsed by, or connected to Blizzard Entertainment. World of Warcraft is a
 > trademark of Blizzard Entertainment, Inc. No game client files are included in this repository.
 
-▶ **[Watch the 90-second demo](https://youtu.be/VIDEO_ID)**
-<!-- TODO: replace VIDEO_ID with the YouTube link before submitting -->
+▶ **[Watch the 90-second demo](https://youtu.be/xvI0xVbxBtk)**
 
 ---
 
