@@ -50,7 +50,10 @@ enum ChatChannel: int
             self::Say, self::Yell, self::Channel, self::Emote, self::TextEmote => 'say',
             self::Party, self::PartyLeader, self::Raid, self::RaidLeader,
             self::RaidWarning, self::Battleground, self::BattlegroundLeader => 'party',
-            self::Guild, self::Officer => 'guild',
+            self::Guild => 'guild',
+            // Officer chat is the officers' only. Answered as plain guild chat, a reply to
+            // something said in confidence went to every member.
+            self::Officer => 'officer',
             self::Whisper => 'whisper',
         };
     }

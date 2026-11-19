@@ -21,8 +21,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * doing" and "what are they doing", which is far more reliable than parsing the playerbots
  * console output for a quest list.
  *
- * The data is as fresh as the last save, and the listener runs `saveall` every loop, so in
- * practice it is seconds old.
+ * The data is as fresh as the last save, and the listener saves every few seconds and before
+ * answering anyone, so in practice it is seconds old.
  */
 #[AsAlias(QuestLogInterface::class)]
 final readonly class QuestLog implements QuestLogInterface

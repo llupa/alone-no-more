@@ -322,6 +322,38 @@ final readonly class GameKnowledge implements GameKnowledgeInterface
         ], $rows);
     }
 
+    public function nearestSpawn(string $name, Position $from): ?array
+    {
+        $row = $this->world->fetchAssociative(
+            <<<'SQL'
+                SELECT ct.name, c.map, c.position_x AS x, c.position_y AS y, c.position_z AS z
+                FROM creature c
+                JOIN creature_template ct ON ct.entry = c.id
+                WHERE ct.name LIKE :like
+                  AND c.map = :map
+                  AND (ct.flags_extra & 0x80) = 0
+                  AND ct.name NOT LIKE '[%'
+                -- The same preference as findCreatures, then whichever spawn is closest.
+                ORDER BY (ct.name = :exact) DESC, CHAR_LENGTH(ct.name),
+                         POW(c.position_x - :x, 2) + POW(c.position_y - :y, 2)
+                LIMIT 1
+                SQL,
+            ['like' => '%'.$name.'%', 'exact' => $name, 'map' => $from->mapId, 'x' => $from->x, 'y' => $from->y],
+        );
+
+        if (false === $row) {
+            return null;
+        }
+
+        return [
+            'name' => (string) $row['name'],
+            'map' => (int) $row['map'],
+            'x' => (float) $row['x'],
+            'y' => (float) $row['y'],
+            'z' => (float) $row['z'],
+        ];
+    }
+
     /**
      * What a quest actually asks you to fetch, resolved to item names.
      *

@@ -95,6 +95,19 @@ interface GameKnowledgeInterface
     public function findCreatures(string $name, int $limit = 5): array;
 
     /**
+     * The one spawn of a creature nearest a point, on that point's map.
+     *
+     * For walking somewhere, where the average {@see findCreatures()} gives is the wrong
+     * answer: for a creature spawned at two camps it is the empty field between them, at a
+     * height that may be inside the hill. The map is fixed by the point, so a creature that
+     * also spawns in an instance is not reported as being on another continent.
+     *
+     * @return array{name: string, map: int, x: float, y: float, z: float}|null null when it has
+     *                                                                          no spawn on that map
+     */
+    public function nearestSpawn(string $name, Position $from): ?array;
+
+    /**
      * What a quest actually asks you to fetch, resolved to item names.
      *
      * @return array<int, array{item: string, id: int, count: int}>

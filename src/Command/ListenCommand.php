@@ -16,6 +16,7 @@ use App\Roleplay\Milestones\MilestoneRepository;
 use App\Roleplay\RoleplayResponder;
 use App\Roleplay\Travel\Journeys;
 use App\World\Chat\ChatEventRepositoryInterface;
+use App\World\SaveSchedule;
 use App\World\WorldGatewayInterface;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Attribute\Option;
@@ -62,7 +63,10 @@ final class ListenCommand
         bool $explain = false,
         #[Option(description: 'Do not populate the world; only answer chat.')]
         bool $noHerding = false,
+        #[Option(description: 'Seconds between full saves of the world when nobody is talking.')]
+        int $saveEvery = 5,
     ): int {
+        $saves = new SaveSchedule((float) $saveEvery);
         $watermark = $backlog ? 0 : $this->chatEvents->latestId();
 
         $io->title('Alone No More — listening');
@@ -83,9 +87,14 @@ final class ListenCommand
         // the return below really is unreachable. Both are deliberate.
         // @phpstan-ignore while.alwaysTrue
         while (true) {
-            // Positions must be fresh before we decide who is in earshot: AzerothCore only
-            // persists them every 15 minutes otherwise.
-            $this->world->refresh();
+            // Fetched first, so that a line waiting to be answered gets a fresh save: who is in
+            // earshot depends on where people stand now. AzerothCore only persists positions
+            // every fifteen minutes on its own; see SaveSchedule for why not every pass either.
+            $events = $this->chatEvents->since($watermark);
+
+            if ($saves->isDue(microtime(true), [] !== $events)) {
+                $this->world->refresh();
+            }
 
             if (!$noHerding) {
                 $this->keepTheWorldPopulated($io);
@@ -114,7 +123,7 @@ final class ListenCommand
                 $io->writeln('<fg=magenta>  '.$muttered.'</>');
             }
 
-            foreach ($this->chatEvents->since($watermark) as $event) {
+            foreach ($events as $event) {
                 $watermark = max($watermark, $event->id);
 
                 $io->writeln(\sprintf(

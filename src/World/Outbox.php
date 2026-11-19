@@ -67,6 +67,28 @@ final readonly class Outbox
         return ['done' => false, 'error' => ''];
     }
 
+    /**
+     * How the latest order of one kind for a bot turned out.
+     *
+     * For news that arrives after an order was accepted: a walk is 'done' the moment the module
+     * takes it, and failed later if the companion loses the way.
+     *
+     * @return array{status: string, error: string}|null null when no such order was ever sent
+     */
+    public function latest(int $botGuid, string $action): ?array
+    {
+        $row = $this->connection->fetchAssociative(
+            'SELECT status, error FROM anm_outbox WHERE bot_guid = :bot AND action = :action ORDER BY id DESC LIMIT 1',
+            ['bot' => $botGuid, 'action' => $action],
+        );
+
+        if (false === $row) {
+            return null;
+        }
+
+        return ['status' => (string) $row['status'], 'error' => (string) ($row['error'] ?? '')];
+    }
+
     public function statusOf(int $outboxId): ?string
     {
         $status = $this->connection->fetchOne(

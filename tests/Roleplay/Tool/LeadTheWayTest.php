@@ -154,7 +154,7 @@ final class LeadTheWayTest extends TestCase
         $world = $this->createStub(WorldGatewayInterface::class);
         $world->method('execute')->willReturn('ok');
 
-        $journeys = new Journeys($world, new PlayerbotCommandRunner($world));
+        $journeys = new Journeys($world, new PlayerbotCommandRunner($world), new LeadOrders(new Outbox($connection)));
         $tools = $this->tools($connection, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
             'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0, 'z' => 42.0]], $journeys, $world);
 
@@ -163,6 +163,121 @@ final class LeadTheWayTest extends TestCase
 
         self::assertSame(['lead', 'unlead'], array_column($queued, 'action'));
         self::assertSame([], $journeys->tick(), 'the watcher should have forgotten the walk too');
+    }
+
+    /**
+     * A creature with a dozen spawns has its position averaged in the records, and the
+     * average of two camps is the empty field between them, at a height that may be inside the
+     * hill. Walking goes to the one spawn nearest the companion instead.
+     */
+    public function testItWalksToTheNearestSpawnNotTheAverageOfThemAll(): void
+    {
+        $queued = [];
+        $connection = $this->outboxThatAccepts($queued);
+
+        $this->tools(
+            $connection,
+            [['name' => 'Defias Pillager', 'level_min' => 14, 'level_max' => 15,
+                'spawns' => 12, 'map' => 0, 'x' => 300.0, 'y' => 0.0, 'z' => 80.0]],
+            nearest: ['name' => 'Defias Pillager', 'map' => 0, 'x' => 100.0, 'y' => 0.0, 'z' => 42.0],
+        )->leadTheWay('Defias Pillager');
+
+        self::assertCount(1, $queued);
+        self::assertSame('95.00;0.00;42.00', $queued[0]['message']);
+    }
+
+    /**
+     * The first match in the records can be a spawn inside an instance. That is not the same
+     * as being on another continent when there is one standing down the road.
+     */
+    public function testASpawnInAnInstanceDoesNotHideOneNearby(): void
+    {
+        $queued = [];
+        $connection = $this->outboxThatAccepts($queued);
+
+        $answer = $this->tools(
+            $connection,
+            [['name' => 'Defias Pillager', 'level_min' => 14, 'level_max' => 15,
+                'spawns' => 4, 'map' => 36, 'x' => -50.0, 'y' => 20.0, 'z' => 10.0]],
+            nearest: ['name' => 'Defias Pillager', 'map' => 0, 'x' => 100.0, 'y' => 0.0, 'z' => 42.0],
+        )->leadTheWay('Defias Pillager');
+
+        self::assertCount(1, $queued);
+        self::assertStringNotContainsString('another continent', $answer);
+    }
+
+    /**
+     * Ending a walk goes through the outbox and the new order straight to the server, so the
+     * new order used to land first: "stay" applied, and then the module walked the companion
+     * a few more paces toward where it had been going. The walk is ended, and that is waited
+     * for, before anything else is sent.
+     */
+    public function testEndingAWalkLandsBeforeTheOrderThatReplacesIt(): void
+    {
+        $log = [];
+        [$connection, $world] = $this->loggingServer($log);
+        $journeys = new Journeys($world, new PlayerbotCommandRunner($world), new LeadOrders(new Outbox($connection)));
+        $tools = $this->tools($connection, [['name' => 'Deputy Willem', 'level_min' => 5, 'level_max' => 5,
+            'spawns' => 1, 'map' => 0, 'x' => 100.0, 'y' => 0.0, 'z' => 42.0]], $journeys, $world);
+
+        $tools->leadTheWay('Deputy Willem');
+        $log = [];
+        $tools->doThis('stay');
+
+        self::assertSame(['queued unlead', 'awaited', 'sent'], $log);
+    }
+
+    /**
+     * Waiting costs up to half a second, so it is only done when there is a walk to end.
+     */
+    public function testAnOrderWithNoWalkToEndIsNotHeldUp(): void
+    {
+        $log = [];
+        [$connection, $world] = $this->loggingServer($log);
+        $journeys = new Journeys($world, new PlayerbotCommandRunner($world), new LeadOrders(new Outbox($connection)));
+        $tools = $this->tools($connection, [], $journeys, $world);
+
+        $tools->doThis('stay');
+
+        self::assertSame(['queued unlead', 'sent'], $log);
+    }
+
+    /**
+     * An outbox and a server that write down, in one list, everything done to them.
+     *
+     * @param list<string> $log
+     *
+     * @return array{0: Connection, 1: WorldGatewayInterface}
+     */
+    private function loggingServer(array &$log): array
+    {
+        $connection = $this->createMock(Connection::class);
+        $connection->method('insert')->willReturnCallback(
+            static function (string $table, array $data) use (&$log): int {
+                $log[] = 'queued '.$data['action'];
+
+                return 1;
+            },
+        );
+        $connection->method('lastInsertId')->willReturn('1');
+        $connection->method('fetchAssociative')->willReturnCallback(
+            static function () use (&$log): array {
+                $log[] = 'awaited';
+
+                return ['status' => 'done', 'error' => ''];
+            },
+        );
+
+        $world = $this->createStub(WorldGatewayInterface::class);
+        $world->method('execute')->willReturnCallback(
+            static function () use (&$log): string {
+                $log[] = 'sent';
+
+                return 'ok';
+            },
+        );
+
+        return [$connection, $world];
     }
 
     /**
@@ -187,7 +302,9 @@ final class LeadTheWayTest extends TestCase
     }
 
     /**
-     * @param array<int, array<string, mixed>> $creatures
+     * @param array<int, array<string, mixed>>                                 $creatures
+     * @param array{name: string, map: int, x: float, y: float, z: float}|null $nearest   the spawn nearest the
+     *                                                                                    companion, if any on their map
      */
     private function tools(
         Connection $connection,
@@ -195,11 +312,13 @@ final class LeadTheWayTest extends TestCase
         ?Journeys $journeys = null,
         ?WorldGatewayInterface $world = null,
         int $botZoneId = 12,
+        ?array $nearest = null,
     ): CompanionTools {
         $world ??= $this->createStub(WorldGatewayInterface::class);
 
         $knowledge = $this->createStub(GameKnowledgeInterface::class);
         $knowledge->method('findCreatures')->willReturn($creatures);
+        $knowledge->method('nearestSpawn')->willReturn($nearest);
 
         $context = new BotCommandContext();
         $context->enter(
@@ -218,7 +337,7 @@ final class LeadTheWayTest extends TestCase
             $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
-            $journeys ?? new Journeys($world, new PlayerbotCommandRunner($world)),
+            $journeys ?? new Journeys($world, new PlayerbotCommandRunner($world), new LeadOrders(new Outbox($connection))),
             new LeadOrders(new Outbox($connection)),
             new ZoneBounds('/nonexistent'),
         );

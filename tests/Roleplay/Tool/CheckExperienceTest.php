@@ -92,7 +92,7 @@ final class CheckExperienceTest extends TestCase
             $levels,
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
-            new Journeys($world, $runner),
+            new Journeys($world, $runner, new LeadOrders(new Outbox($this->createStub(Connection::class)))),
             new LeadOrders(new Outbox($this->createStub(Connection::class))),
             new ZoneBounds('/nonexistent'),
         );

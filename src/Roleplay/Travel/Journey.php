@@ -36,8 +36,14 @@ final class Journey
         public readonly float $startedAt,
         /** Close enough. The bot stops short of the target and pathing rarely lands on a point. */
         public readonly float $arrivalYards = 10.0,
-        /** A walk that never finishes must not leave a bot marked as travelling for ever. */
-        public readonly float $giveUpAfter = 180.0,
+        /**
+         * A walk that never finishes must not leave a bot marked as travelling for ever.
+         *
+         * Only a backstop. The module gives up on a walk that stops getting closer, and says
+         * so; this is for when nothing is heard at all. It used to be three minutes, which cut
+         * off long walks that were still going fine.
+         */
+        public readonly float $giveUpAfter = 900.0,
         /**
          * How far ahead to place the anchor, which must stay under the server's
          * `Playerbots.ReactDistance` (150 yards as shipped). The margin is deliberate: the leg

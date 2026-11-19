@@ -158,6 +158,41 @@ final class ReplayKnowledge implements GameKnowledgeInterface
         return \array_slice(array_values($byName), 0, $limit);
     }
 
+    public function nearestSpawn(string $name, Position $from): ?array
+    {
+        $nearest = null;
+        $best = \INF;
+        $chosen = null;
+
+        // The best name first, as findCreatures has it; within that name, the closest row.
+        foreach ($this->matchByName('creatures', $name, \PHP_INT_MAX) as $row) {
+            if ((int) $row['map'] !== $from->mapId) {
+                continue;
+            }
+
+            $chosen ??= (string) $row['name'];
+
+            if ((string) $row['name'] !== $chosen) {
+                continue;
+            }
+
+            $distance = hypot((float) $row['x'] - $from->x, (float) $row['y'] - $from->y);
+
+            if ($distance < $best) {
+                $best = $distance;
+                $nearest = [
+                    'name' => (string) $row['name'],
+                    'map' => (int) $row['map'],
+                    'x' => (float) $row['x'],
+                    'y' => (float) $row['y'],
+                    'z' => (float) ($row['z'] ?? 0.0),
+                ];
+            }
+        }
+
+        return $nearest;
+    }
+
     public function questRequiredItems(int $questId): array
     {
         foreach ($this->rows('quests') as $row) {

@@ -172,7 +172,7 @@ final class CompanionActionsTest extends TestCase
             $this->createStub(LevelProgressInterface::class),
             new BotSpeechDispatcher($this->createStub(Connection::class)),
             new ErrandBook(),
-            new Journeys($world, $runner),
+            new Journeys($world, $runner, new LeadOrders(new Outbox($this->createStub(Connection::class)))),
             new LeadOrders(new Outbox($this->createStub(Connection::class))),
             new ZoneBounds('/nonexistent'),
         );

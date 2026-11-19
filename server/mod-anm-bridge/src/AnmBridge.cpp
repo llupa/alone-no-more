@@ -93,6 +93,37 @@ namespace
 
     std::unordered_map<uint32 /*bot low guid*/, Lead> g_leads;
 
+    // The last outbox row taken, so a row is never taken twice.
+    //
+    // Rows are read with a synchronous query but marked done with an asynchronous one, and the
+    // async queue can be seconds behind when the server is saving a crowd. Selecting on status
+    // alone then picked the same row up again on the next tick, and a companion said its line
+    // twice. Restarting forgets this, which only matters for rows the server never got to mark.
+    uint64 g_lastOutboxId = 0;
+
+    // A walk that ends anywhere but the destination.
+    //
+    // Stop, and go back to following: `lead` switched following off, and a companion whose walk
+    // failed must not be left standing in a field without it. Arriving does not come through
+    // here, because there the companion should wait by the NPC it led you to.
+    //
+    // The PHP side hears about it through the order that started the walk. That row is already
+    // 'done' (accepted), so failing it afterwards is the only news of what became of it.
+    void AbandonLead(Player* bot, std::string const& why)
+    {
+        bot->GetMotionMaster()->Clear();
+        bot->GetMotionMaster()->MoveIdle();
+
+        if (PlayerbotAI* botAI = GET_PLAYERBOT_AI(bot))
+            botAI->ChangeStrategy("+follow", BOT_STATE_NON_COMBAT);
+
+        std::ostringstream q;
+        q << "UPDATE anm_outbox SET status='failed', error='" << Escape(why)
+          << "' WHERE bot_guid=" << bot->GetGUID().GetCounter()
+          << " AND action='lead' ORDER BY id DESC LIMIT 1";
+        CharacterDatabase.Execute(q.str());
+    }
+
     // How close counts as arrived. The player follows the bot, so stopping a few paces off the
     // NPC is better than standing inside it.
     constexpr float LEAD_ARRIVED_YARDS = 6.0f;
@@ -184,7 +215,14 @@ namespace
         if (text.size() <= MAX_CHAT_LEN)
             return text;
 
-        return text.substr(0, MAX_CHAT_LEN - 3) + "...";
+        // Back up to the start of a character. A cut through the middle of one leaves a stray
+        // lead byte, which the client draws as garbage and a utf8mb4 column refuses outright.
+        // Continuation bytes are 10xxxxxx; anything else starts a character.
+        std::size_t cut = MAX_CHAT_LEN - 3;
+        while (cut > 0 && (static_cast<unsigned char>(text[cut]) & 0xC0) == 0x80)
+            --cut;
+
+        return text.substr(0, cut) + "...";
     }
 }
 
@@ -262,6 +300,12 @@ void AnmBridge::RecordChat(Player* sender, uint32 type, uint32 lang, std::string
     if (!sender || msg.empty())
         return;
 
+    // Addon traffic travels on the same channels with LANG_ADDON, and the chat hooks see it:
+    // Questie or DBM announcing themselves over party chat would otherwise be read as the
+    // player talking, and a companion would answer a version handshake in character.
+    if (lang == LANG_ADDON)
+        return;
+
     // Bot chatter is recorded too: the roleplay agent needs to see what bots already said, or it
     // will talk over them. Whether a sender IS a bot is resolved on the PHP side by joining
     // characters.account against account.username LIKE 'RNDBOT%' — doing it here would mean either
@@ -288,8 +332,16 @@ void AnmBridge::DriveLeads()
     {
         Player* bot = ObjectAccessor::FindPlayerByLowGUID(it->first);
 
-        if (!bot || !bot->IsInWorld() || !bot->IsAlive() || bot->GetMapId() != it->second.mapId)
+        // Logged out: nothing to stop, and the PHP side notices an offline companion itself.
+        if (!bot || !bot->IsInWorld())
         {
+            it = g_leads.erase(it);
+            continue;
+        }
+
+        if (!bot->IsAlive() || bot->GetMapId() != it->second.mapId)
+        {
+            AbandonLead(bot, bot->IsAlive() ? "left for another map" : "died on the way");
             it = g_leads.erase(it);
             continue;
         }
@@ -335,8 +387,7 @@ void AnmBridge::DriveLeads()
             {
                 LOG_INFO("module.anm", "[AnmBridge] {} gave up leading, {} yards short",
                          bot->GetName(), static_cast<uint32>(distance));
-                bot->GetMotionMaster()->Clear();
-                bot->GetMotionMaster()->MoveIdle();
+                AbandonLead(bot, "lost the way " + std::to_string(static_cast<uint32>(distance)) + " yards short");
                 it = g_leads.erase(it);
                 continue;
             }
@@ -348,6 +399,7 @@ void AnmBridge::DriveLeads()
 
         if (!botAI)
         {
+            AbandonLead(bot, "is not a companion that can be led");
             it = g_leads.erase(it);
             continue;
         }
@@ -367,12 +419,12 @@ void AnmBridge::DriveLeads()
         // rather than taking the PATHFIND_SHORTCUT that walked a companion under the world.
         AnmMover mover(botAI);
 
-        if (!mover.MoveTo(bot->GetMapId(), it->second.x, it->second.y, it->second.z, false, false, true))
-        {
-            // Often temporary — a fight, a doorway, a few paces of drift — so it is counted
-            // rather than acted on at once. The stuck clock above does the giving up.
-            it->second.stuckFor += LEAD_INTERVAL_MS;
-        }
+        // A refusal here is not counted as being stuck. Often it is harmless — the same hop
+        // re-sent while the last is still being walked comes back false from `IsDuplicateMove`
+        // — and a bot that really is going nowhere is already caught by the distance check
+        // above. Counting both made every stuck tick count double, and walks round an obstacle
+        // were given up after ten seconds instead of twenty.
+        mover.MoveTo(bot->GetMapId(), it->second.x, it->second.y, it->second.z, false, false, true);
 
         ++it;
     }
@@ -380,9 +432,11 @@ void AnmBridge::DriveLeads()
 
 void AnmBridge::DrainOutbox()
 {
-    QueryResult result = CharacterDatabase.Query(
-        "SELECT id, bot_guid, action, target_guid, message FROM anm_outbox "
-        "WHERE status = 'pending' ORDER BY id LIMIT 20");
+    std::ostringstream select;
+    select << "SELECT id, bot_guid, action, target_guid, message FROM anm_outbox "
+              "WHERE status = 'pending' AND id > " << g_lastOutboxId << " ORDER BY id LIMIT 20";
+
+    QueryResult result = CharacterDatabase.Query(select.str());
 
     if (!result)
         return;
@@ -391,6 +445,7 @@ void AnmBridge::DrainOutbox()
     {
         Field* f = result->Fetch();
         uint64 const id = f[0].Get<uint64>();
+        g_lastOutboxId = id;
         uint32 const botGuid = f[1].Get<uint32>();
         std::string const action = f[2].Get<std::string>();
         uint32 const targetGuid = f[3].Get<uint32>();
@@ -464,31 +519,44 @@ void AnmBridge::DrainOutbox()
                 continue;
             }
 
-            // 40 yards is a little beyond the player's own targeting range, so anything they can
-            // see and mean is in reach.
-            std::string seenButUnattackable;
-            Unit* victim = FindAttackable(bot, 40.0f, message, seenButUnattackable);
-            if (!victim)
+            // Already fighting something that answers to the name: carry on. An errand re-sends
+            // `attack` every few seconds whether or not the bot is busy, and switching to
+            // whatever happened to be nearest left a wounded kobold to walk free while the
+            // companion started on a fresh one.
+            Unit* const current = bot->GetVictim();
+            if (current && current->IsAlive() && bot->IsValidAttackTarget(current) &&
+                (message.empty() || NameMatches(current->GetName(), Lowered(message))))
             {
-                // Three different answers, because they mean three different things to whoever
-                // asked: nobody by that name, someone by that name who cannot be fought, or
-                // nothing in reach at all.
-                if (!seenButUnattackable.empty())
-                    fail(seenButUnattackable + " is here but cannot be attacked");
-                else
-                    fail(message.empty() ? "nothing attackable within 40 yards"
-                                         : "nothing called '" + message + "' attackable within 40 yards");
-
-                continue;
+                // Fall through to 'done'.
             }
+            else
+            {
+                // 40 yards is a little beyond the player's own targeting range, so anything they
+                // can see and mean is in reach.
+                std::string seenButUnattackable;
+                Unit* victim = FindAttackable(bot, 40.0f, message, seenButUnattackable);
+                if (!victim)
+                {
+                    // Three different answers, because they mean three different things to
+                    // whoever asked: nobody by that name, someone by that name who cannot be
+                    // fought, or nothing in reach at all.
+                    if (!seenButUnattackable.empty())
+                        fail(seenButUnattackable + " is here but cannot be attacked");
+                    else
+                        fail(message.empty() ? "nothing attackable within 40 yards"
+                                             : "nothing called '" + message + "' attackable within 40 yards");
 
-            // Both halves matter. Selecting and attacking starts the fight now; handing the guid
-            // to the bot's own AI as a prioritised target is what stops its combat engine
-            // dropping back to idle on the next tick and undoing us.
-            botAI->GetAiObjectContext()->GetValue<GuidVector>("prioritized targets")->Set({victim->GetGUID()});
-            bot->SetSelection(victim->GetGUID());
-            bot->Attack(victim, true);
-            bot->GetMotionMaster()->MoveChase(victim);
+                    continue;
+                }
+
+                // Both halves matter. Selecting and attacking starts the fight now; handing the
+                // guid to the bot's own AI as a prioritised target is what stops its combat
+                // engine dropping back to idle on the next tick and undoing us.
+                botAI->GetAiObjectContext()->GetValue<GuidVector>("prioritized targets")->Set({victim->GetGUID()});
+                bot->SetSelection(victim->GetGUID());
+                bot->Attack(victim, true);
+                bot->GetMotionMaster()->MoveChase(victim);
+            }
         }
         else if (action == "lead")
         {
@@ -540,7 +608,15 @@ void AnmBridge::DrainOutbox()
         }
         else if (action == "unlead")
         {
-            g_leads.erase(botGuid);
+            // Stop the hop in flight too, or the companion finishes walking it — which on a
+            // long route can be most of the way — after being told to stop. Only when there was
+            // a walk: an `unlead` for a bot that was not leading must not interrupt whatever
+            // else it is doing.
+            if (g_leads.erase(botGuid))
+            {
+                bot->GetMotionMaster()->Clear();
+                bot->GetMotionMaster()->MoveIdle();
+            }
         }
         else if (action == "say")
         {
@@ -605,7 +681,7 @@ void AnmBridge::DrainOutbox()
             // actually delivered.
             RecordChat(bot, CHAT_MSG_PARTY, LANG_UNIVERSAL, message, ObjectGuid::Empty, "");
         }
-        else if (action == "guild")
+        else if (action == "guild" || action == "officer")
         {
             Guild* guild = bot->GetGuildId() ? sGuildMgr->GetGuildById(bot->GetGuildId()) : nullptr;
             if (!guild)
@@ -613,11 +689,16 @@ void AnmBridge::DrainOutbox()
                 fail("bot not in a guild");
                 continue;
             }
-            guild->BroadcastToGuild(bot->GetSession(), false, message, LANG_UNIVERSAL);
+
+            // An answer to the officer channel stays in the officer channel. Sent as plain guild
+            // chat, a reply to something said in confidence was read out to everyone.
+            bool const officers = action == "officer";
+            guild->BroadcastToGuild(bot->GetSession(), officers, message, LANG_UNIVERSAL);
 
             // Same reasoning as the party branch: a guild broadcast is not player chat and the
             // hook never sees it.
-            RecordChat(bot, CHAT_MSG_GUILD, LANG_UNIVERSAL, message, ObjectGuid::Empty, "");
+            RecordChat(bot, officers ? CHAT_MSG_OFFICER : CHAT_MSG_GUILD, LANG_UNIVERSAL, message,
+                       ObjectGuid::Empty, "");
         }
         else
         {

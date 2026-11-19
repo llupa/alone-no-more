@@ -269,14 +269,6 @@ final readonly class CompanionTools
     }
 
     /**
-     * Persistent combat, rather than one swing.
-     *
-     * `attack` is a single order: the bot engages once and stops, which is why "attack until you
-     * have seven" got one wolf and silence. `grind` is a *strategy* in the mod rather than a
-     * command, so adding it to the non-combat engine is what makes the behaviour continue —
-     * `nc +grind` rather than `grind`, a distinction that cost an evening once before.
-     */
-    /**
      * @param string $who the name the player used
      */
     public function leadTheWay(string $who): string
@@ -288,7 +280,10 @@ final readonly class CompanionTools
             return \sprintf('There is nobody called "%s" in the records, so you cannot lead them anywhere.', $who);
         }
 
-        $target = $found[0];
+        // The spawn nearest the companion, not the average of every spawn: for a creature at two
+        // camps the average is the empty field between them. Nothing on this map at all means
+        // the first match, which is then on another continent and refused below.
+        $target = $this->knowledge->nearestSpawn($who, $bot->position) ?? $found[0];
 
         if ($target['map'] !== $bot->position->mapId) {
             return \sprintf('%s is on another continent entirely. Say so; you cannot walk there.', $target['name']);
@@ -377,6 +372,12 @@ final readonly class CompanionTools
     }
 
     /**
+     * Persistent combat, rather than one swing.
+     *
+     * `attack` is a single order: the bot engages once and stops, which is why "attack until you
+     * have seven" got one wolf and silence. An errand sends it again every few seconds until
+     * the job is done.
+     *
      * @param string $what      what the player called it, or empty for whatever is nearest
      * @param string $forQuest  the exact quest title this serves, when one was named
      * @param bool   $forPlayer true when it is the player's copy of the quest being finished
@@ -425,10 +426,19 @@ final readonly class CompanionTools
      * announce the arrival. Forgetting either leaves a companion that keeps walking after
      * being told to stop, or one that announces arriving somewhere it was never sent.
      */
+    /**
+     * End a walk before the order that replaces it.
+     *
+     * Waited on when there is a walk to end. The new order goes straight to the server while
+     * this one goes through the outbox, so without waiting it landed second: "stay" applied,
+     * then the module sent the companion a few more paces toward the old destination.
+     */
     private function stopWalking(int $botGuid): void
     {
+        $walking = \in_array($botGuid, $this->journeys->walkingGuids(), true);
+
         $this->journeys->cancel($botGuid);
-        $this->leads->stop($botGuid);
+        $this->leads->stop($botGuid, wait: $walking);
     }
 
     public function stopFighting(): string

@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace App\Roleplay;
 
-use Symfony\Component\String\TruncateMode;
-
-use function Symfony\Component\String\u;
-
 /**
  * Decides whether what the model produced is fit to say out loud, and tidies it if so.
  *
@@ -23,10 +19,16 @@ use function Symfony\Component\String\u;
 final readonly class ReplySanitiser
 {
     /**
-     * WoW's chat line limit. Anything longer is silently dropped by the client, so a reply has
-     * to be cut before it leaves here.
+     * WoW's chat line limit, in bytes. Anything longer is silently dropped by the client, so a
+     * reply has to be cut before it leaves here.
+     *
+     * Bytes, not characters: an em-dash is three of them. Counting characters let a reply
+     * full of dashes and accents through at 270 bytes, and the module then cut it again by
+     * byte, through the middle of a character.
      */
-    private const MAX_CHAT_LENGTH = 255;
+    private const MAX_CHAT_BYTES = 255;
+
+    private const ELLIPSIS = '…';
 
     /**
      * Anything a person would never say in a tavern.
@@ -70,25 +72,42 @@ final readonly class ReplySanitiser
             return null;
         }
 
-        if (u($reply)->length() <= self::MAX_CHAT_LENGTH) {
+        if (\strlen($reply) <= self::MAX_CHAT_BYTES) {
             return $reply;
         }
 
         // Prefer to end on a finished sentence. A word-boundary cut leaves things like "work
         // fit for a priest,…" in party chat, which reads as the bot being interrupted rather
         // than as someone who stopped talking.
-        $wholeSentences = self::upToLastSentence(u($reply)->slice(0, self::MAX_CHAT_LENGTH)->toString());
+        $wholeSentences = self::upToLastSentence(self::fitting($reply, self::MAX_CHAT_BYTES));
 
         if (null !== $wholeSentences) {
             return $wholeSentences;
         }
 
-        // No sentence ended in range — one very long clause. Cut by code point, not by byte,
-        // and at a word boundary. `substr` would split a multi-byte character in half: "Die
-        // Prüfung" truncated by bytes ends "Pr\xc3", which the client renders as mojibake.
-        return u($reply)
-            ->truncate(self::MAX_CHAT_LENGTH, '…', TruncateMode::WordBefore)
-            ->toString();
+        // No sentence ended in range — one very long clause. Cut at a word boundary, leaving
+        // room for the ellipsis, which is itself three bytes.
+        $room = self::fitting($reply, self::MAX_CHAT_BYTES - \strlen(self::ELLIPSIS));
+
+        if (' ' !== ($reply[\strlen($room)] ?? ' ')) {
+            $space = mb_strrpos($room, ' ');
+
+            if (false !== $space && $space > 0) {
+                $room = mb_substr($room, 0, $space);
+            }
+        }
+
+        return rtrim($room).self::ELLIPSIS;
+    }
+
+    /**
+     * The longest start of the text that fits in so many bytes without splitting a character.
+     * `substr` would: "Die Prüfung" cut by bytes ends "Pr\xc3", which the client renders as
+     * mojibake.
+     */
+    private static function fitting(string $text, int $bytes): string
+    {
+        return mb_strcut($text, 0, $bytes, 'UTF-8');
     }
 
     /**

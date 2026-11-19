@@ -53,11 +53,32 @@ final readonly class LeadOrders
     /**
      * Forget where a companion was going, when something else takes over its feet.
      *
-     * Fire and forget: a walk that is being abandoned is not worth waiting on, and the module
-     * drops an unknown bot silently.
+     * @param bool $wait whether to wait for the module to act on it, for when another order is
+     *                   about to follow and must land after this one
      */
-    public function stop(int $botGuid): void
+    public function stop(int $botGuid, bool $wait = false): void
     {
-        $this->outbox->queue($botGuid, 'unlead', '');
+        $id = $this->outbox->queue($botGuid, 'unlead', '');
+
+        if ($wait) {
+            $this->outbox->awaitOutcome($id);
+        }
+    }
+
+    /**
+     * Why the module gave up on a companion's walk, or null while it is still going.
+     *
+     * The module is the one that can tell a companion making slow progress round a lake from one
+     * jogging into a rock, so it decides when a walk has failed, and says so here.
+     */
+    public function failure(int $botGuid): ?string
+    {
+        $latest = $this->outbox->latest($botGuid, 'lead');
+
+        if (null === $latest || 'failed' !== $latest['status']) {
+            return null;
+        }
+
+        return '' !== $latest['error'] ? $latest['error'] : 'lost the way';
     }
 }

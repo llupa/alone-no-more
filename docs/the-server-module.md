@@ -16,13 +16,16 @@ message bodies. There is no log to tail.
 
 So the module hooks `PlayerScript`'s `OnPlayerCanUseChat` family — which fires for say, yell,
 whisper, party, guild and channel, with the full context — and appends to `anm_chat_event`. All
-five overloads return `true`: it is a listener, not a censor.
+five overloads return `true`: it is a listener, not a censor. Addon traffic (`LANG_ADDON`) uses
+the same channels and is skipped, or a companion would answer an addon's version handshake.
 
 ## 2. Making a bot speak
 
 No core or playerbot command makes a bot say arbitrary text, and a PHP process cannot touch a
 `Player` object. The module drains an `anm_outbox` table on the world tick, every 500 ms, and
-turns rows into `say`, `yell`, `whisper`, `party` and `guild`.
+turns rows into `say`, `yell`, `whisper`, `party`, `guild` and `officer`. Each row is taken once:
+the module remembers the last id it took, because the "done" mark is written asynchronously and
+can lag behind the next tick.
 
 Queueing rather than calling also means a reply that arrives while a bot is logging out fails
 one row instead of breaking a conversation.

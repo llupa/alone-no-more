@@ -26,6 +26,7 @@ final class Journeys
     public function __construct(
         private readonly WorldGatewayInterface $world,
         private readonly PlayerbotCommandRunner $runner,
+        private readonly LeadOrders $leads,
         private readonly LoggerInterface $logger = new NullLogger(),
     ) {
     }
@@ -100,13 +101,23 @@ final class Journeys
                 continue;
             }
 
+            // The module decides when a walk has failed, and has already stopped the companion
+            // and put them back to following by the time it says so.
+            if (null !== $why = $this->leads->failure($guid)) {
+                unset($this->walking[$guid]);
+                $news[$guid] = \sprintf('%s could not reach %s: %s', $bot->name, $journey->towards, $why);
+
+                continue;
+            }
+
+            // Nothing heard from the module for far too long. It may still be driving the walk,
+            // so end it there before turning following back on, or the two pull the companion
+            // in different directions.
             if ($journey->gaveUp($now)) {
                 unset($this->walking[$guid]);
                 $news[$guid] = \sprintf('%s could not reach %s', $bot->name, $journey->towards);
 
-                // Following was switched off to let them walk, and a failed journey must not
-                // leave a companion standing in a field for the rest of the evening. The
-                // module gives up on its own clock too, so this is only about the strategy.
+                $this->leads->stop($guid);
                 $this->tell($bot->name, 'follow');
 
                 continue;

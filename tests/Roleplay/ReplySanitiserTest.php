@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 /**
  * The last thing between a model and the chat window.
  *
- * WoW drops any line over 255 characters outright, so something has to give — the only question
+ * WoW drops any line over 255 bytes outright, so something has to give — the only question
  * is whether it reads as a person finishing a thought or as a bot being cut off.
  */
 #[CoversClass(ReplySanitiser::class)]
@@ -42,7 +42,7 @@ final class ReplySanitiserTest extends TestCase
         $out = $this->sanitiser->sanitise($long);
 
         self::assertNotNull($out);
-        self::assertLessThanOrEqual(255, mb_strlen($out));
+        self::assertLessThanOrEqual(255, \strlen($out));
         self::assertStringEndsWith('ask them when we arrive.', $out);
         self::assertStringNotContainsString('…', $out);
     }
@@ -56,7 +56,7 @@ final class ReplySanitiserTest extends TestCase
         $out = $this->sanitiser->sanitise(str_repeat('onward ', 60));
 
         self::assertNotNull($out);
-        self::assertLessThanOrEqual(255, mb_strlen($out));
+        self::assertLessThanOrEqual(255, \strlen($out));
         self::assertStringEndsWith('…', $out);
     }
 
@@ -78,6 +78,39 @@ final class ReplySanitiserTest extends TestCase
     }
 
     /**
+     * The limit is in bytes. A reply of 240 characters with a dozen em-dashes is well over 255
+     * bytes, and counting characters let it through to be cut again, by byte, in the module.
+     */
+    public function testTheLimitIsCountedInBytesNotCharacters(): void
+    {
+        $dashes = str_repeat('Onward — ', 26);
+
+        self::assertLessThan(255, mb_strlen($dashes));
+        self::assertGreaterThan(255, \strlen($dashes));
+
+        $out = $this->sanitiser->sanitise($dashes);
+
+        self::assertNotNull($out);
+        self::assertLessThanOrEqual(255, \strlen($out));
+        self::assertStringEndsWith('…', $out);
+        self::assertSame($out, mb_convert_encoding($out, 'UTF-8', 'UTF-8'));
+    }
+
+    /**
+     * A sentence-ending cut has to fit in bytes as well.
+     */
+    public function testASentenceCutFitsInBytes(): void
+    {
+        $text = str_repeat('The road runs south — past the mill — and on to the ford. ', 6);
+
+        $out = $this->sanitiser->sanitise($text);
+
+        self::assertNotNull($out);
+        self::assertLessThanOrEqual(255, \strlen($out));
+        self::assertStringEndsWith('ford.', $out);
+    }
+
+    /**
      * Multi-byte safety: cutting by byte would split an accent in half and the client renders
      * the remains as mojibake.
      */
@@ -86,6 +119,7 @@ final class ReplySanitiserTest extends TestCase
         $out = $this->sanitiser->sanitise(str_repeat('Prüfung über Straße ', 30));
 
         self::assertNotNull($out);
+        self::assertLessThanOrEqual(255, \strlen($out));
         self::assertSame($out, mb_convert_encoding($out, 'UTF-8', 'UTF-8'));
     }
 }
