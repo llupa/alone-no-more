@@ -13,7 +13,7 @@ There are three levels, each a step further in:
 | **3. The real thing** | a private AzerothCore server and a 3.3.5a client | Everything, in the game — see [real-server.md](real-server.md) |
 
 ```bash
-git clone <this repo> && cd alone-no-more
+git clone https://github.com/llupa/alone-no-more.git && cd alone-no-more
 composer install
 ```
 

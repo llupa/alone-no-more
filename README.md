@@ -69,7 +69,7 @@ A recording of that real session is committed, and the whole application runs ag
 game server, no database, no game client:
 
 ```bash
-git clone <this repo> && cd alone-no-more && composer install
+git clone https://github.com/llupa/alone-no-more.git && cd alone-no-more && composer install
 
 # anm:world <character>           who is around the player, in the recorded world
 APP_ENV=replay bin/console anm:world Klemprime
