@@ -30,6 +30,11 @@ final readonly class StagingResult
     public function summary(): string
     {
         if (!$this->changed()) {
+            // Nothing moved because nothing could, which is different news from "all is well".
+            if (null !== $this->limitedBy) {
+                return \sprintf('%d present; %s.', $this->alreadyPresent, $this->limitedBy);
+            }
+
             return \sprintf('%d of %d present, nothing to do.', $this->alreadyPresent, $this->target);
         }
 

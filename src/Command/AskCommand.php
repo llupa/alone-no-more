@@ -41,7 +41,9 @@ final class AskCommand
         try {
             $answer = AgentText::of($this->archivist->call($question)->getContent());
         } catch (\Throwable $e) {
-            $io->error($e->getMessage());
+            // Usually a missing key, and the provider's own wording ("x-api-key header is
+            // required") does not say which key, or that the archivist always runs on Claude.
+            $io->error([$e->getMessage(), 'The archivist runs on Claude: set ANTHROPIC_API_KEY in .env.local, or before the command.']);
 
             return Command::FAILURE;
         }

@@ -93,7 +93,12 @@ final class PartyCommand
 
     private function renderParty(SymfonyStyle $io, Actor $player): void
     {
-        $rows = [[$player->name, 'you', $player->level, '<info>in world</info>']];
+        $rows = [[
+            $player->name,
+            'you',
+            $player->level,
+            $player->isOnline ? '<info>in world</info>' : '<comment>offline</comment>',
+        ]];
 
         foreach ($this->presence->partyMembers($player) as $member) {
             $rows[] = [

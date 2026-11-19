@@ -103,6 +103,36 @@ final class ReplayWorldTest extends TestCase
         }
     }
 
+    /**
+     * The party and the crowd, from the recording. The player used to be listed as a member of
+     * their own party, shown "in world" while the recording has them offline, and the herder
+     * reported "37 of 0 present".
+     */
+    public function testThePartyAndTheCrowdReadTrueFromTheRecording(): void
+    {
+        $kernel = new Kernel('replay', false);
+        $kernel->boot();
+
+        try {
+            $application = new Application($kernel);
+
+            $party = new CommandTester($application->find('anm:party'));
+            $party->execute(['character' => 'Klemprime']);
+            $out = $party->getDisplay();
+
+            self::assertSame(1, substr_count($out, 'Klemprime  '), 'listed once, as "you"');
+            self::assertMatchesRegularExpression('/Klemprime\s+you\s+14\s+offline/', $out);
+            self::assertStringContainsString('Anduril', $out);
+
+            $herd = new CommandTester($application->find('anm:herd'));
+            $herd->execute(['character' => 'Klemprime']);
+
+            self::assertStringContainsString('this is a recording, so nobody can be brought in', $herd->getDisplay());
+        } finally {
+            $kernel->shutdown();
+        }
+    }
+
     public function testACharacterIsDescribedFromTheSnapshot(): void
     {
         $state = $this->inspector()->playerState('Klemprime');

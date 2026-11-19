@@ -28,6 +28,7 @@ final class ReplayStager implements BotStagerInterface
             target: $target ?? 0,
             broughtIn: [],
             sentAway: [],
+            limitedBy: 'this is a recording, so nobody can be brought in or sent away',
         );
     }
 
