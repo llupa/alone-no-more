@@ -26,5 +26,8 @@
 /Errors.log
 /Playerbots.log
 /Server.log
+# Working notes, scripts and screenshots — never part of the published project.
+/.context/
+.DS_Store
 ###< alone-no-more ###
 /.deptrac.cache
