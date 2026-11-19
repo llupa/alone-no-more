@@ -1,7 +1,7 @@
 # Running against a real server
 
-The [README](../README.md) runs the whole application against a recorded world with nothing
-installed. This is the other path: a live AzerothCore server, a 3.3.5a client, and companions
+[Try it without a server](try-it.md) runs the whole application against a recorded world with
+nothing installed. This is the other path: a live AzerothCore server, a 3.3.5a client, and companions
 you can actually walk around with.
 
 It is written to be followed literally, in order. Where a step has a reason that is not obvious,

@@ -14,7 +14,7 @@ mcp:
                 # pipes, so they are already authenticated by being able to start it at all.
                 #
                 # The HTTP transport is deliberately off. It has no authentication of its own,
-                # and three of our tools change the running world — binding that to a local port
+                # and nine of our tools change the running world — binding that to a local port
                 # would let any process on the machine, or any page that can reach localhost,
                 # order bots about. If we ever want it (a web cockpit), it needs a firewall and
                 # a role in front of it first, not just a path.
