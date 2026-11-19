@@ -101,9 +101,3 @@ APP_ENV=replay bin/console anm:talk Klemprime             # talk to him — Clau
 | [The server module](docs/the-server-module.md) | The C++ inside the worldserver, and why it has to be there |
 | [Development](docs/development.md) | Tests, static analysis, layers, and every command |
 | [Architecture](docs/architecture.html) | The interactive diagram — download and open locally |
-
-## Licence
-
-MIT, for the code in this repository. World of Warcraft is a trademark of Blizzard
-Entertainment, Inc.; AzerothCore and mod-playerbots belong to their respective authors. This is a
-non-commercial, educational project, and no game client files are included.
