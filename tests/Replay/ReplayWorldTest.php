@@ -14,6 +14,8 @@ use App\Replay\ReplayKnowledge;
 use App\Replay\ReplayQuestLog;
 use App\Replay\Snapshot;
 use PHPUnit\Framework\TestCase;
+use Symfony\Bundle\FrameworkBundle\Console\Application;
+use Symfony\Component\Console\Tester\CommandTester;
 
 /**
  * The experience of someone who has just cloned the repository.
@@ -72,6 +74,33 @@ final class ReplayWorldTest extends TestCase
         self::assertSame('replay', $kernel->getEnvironment());
 
         $kernel->shutdown();
+    }
+
+    /**
+     * The README's first command, run the way a stranger runs it.
+     *
+     * It has to say it is showing a recording. Without that it printed "zone 44, offline" — true
+     * of the recording, and indistinguishable from a broken server to anyone watching.
+     */
+    public function testTheWorldCommandSaysItIsARecordingAndNamesTheZone(): void
+    {
+        $kernel = new Kernel('replay', false);
+        $kernel->boot();
+
+        try {
+            $tester = new CommandTester((new Application($kernel))->find('anm:world'));
+            $exit = $tester->execute(['character' => 'Klemprime']);
+            $output = preg_replace('/\s+/', ' ', $tester->getDisplay()) ?? '';
+
+            self::assertSame(0, $exit);
+            self::assertStringContainsString('A recording of a real session in Redridge Mountains', $output);
+            self::assertStringContainsString('No game server is running', $output);
+            self::assertStringNotContainsString('zone 44', $output);
+            self::assertStringNotContainsString('offline', $output);
+            self::assertStringContainsString('Anduril', $output, 'and the party is still there');
+        } finally {
+            $kernel->shutdown();
+        }
     }
 
     public function testACharacterIsDescribedFromTheSnapshot(): void

@@ -57,11 +57,25 @@ final class WorldCommand
         }
 
         $io->title($actor->name.' — '.$actor->describe());
-        $io->writeln((string) $actor->position);
+
         // The name, not the number: this is the first thing a stranger following the README
         // sees, and "zone 141" tells them nothing.
-        $io->writeln(\sprintf('%s, %s', $this->areas->name($actor->zoneId) ?? 'zone '.$actor->zoneId,
-            $actor->isOnline ? '<info>online</info>' : '<comment>offline</comment>'));
+        $zoneName = $this->areas->name($actor->zoneId) ?? 'zone '.$actor->zoneId;
+        $recordedAt = $this->world->recordedAt();
+
+        if (null !== $recordedAt) {
+            // Said first and plainly. A recording that looks live reads as a server where
+            // everyone has logged out, and the point of this one is that no server is running.
+            $io->note(\sprintf(
+                'A recording of a real session in %s, captured %s. No game server is running.',
+                $zoneName,
+                $recordedAt->format('j F Y'),
+            ));
+            $io->writeln((string) $actor->position);
+        } else {
+            $io->writeln((string) $actor->position);
+            $io->writeln(\sprintf('%s, %s', $zoneName, $actor->isOnline ? '<info>online</info>' : '<comment>offline</comment>'));
+        }
 
         $near = array_filter(
             $this->world->actorsNear($actor->position, $radius),

@@ -8,6 +8,7 @@ use App\Knowledge\Dbc\AreaNames;
 use App\Knowledge\Dbc\DbcException;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 /**
  * Reads the real AreaTable.dbc when one is available.
@@ -91,5 +92,38 @@ final class AreaNamesTest extends TestCase
         }
 
         self::assertSame('Redridge Mountains', (new AreaNames('/nonexistent/dbc', null, $fixture))->name(44));
+    }
+
+    /**
+     * Recapturing a session rewrites the fixture, and the zones it names have to follow.
+     *
+     * The fixture used to be cached under the same key as the client data, so a new recording
+     * was answered with the old one's zones, and the replay called Redridge "zone 44".
+     */
+    public function testANewRecordingIsNotAnsweredFromAnOldOnesZones(): void
+    {
+        $cache = new ArrayAdapter();
+        $before = $this->fixture([12 => ['name' => 'Elwynn Forest']]);
+        $after = $this->fixture([44 => ['name' => 'Redridge Mountains']]);
+
+        try {
+            self::assertSame('Elwynn Forest', (new AreaNames('/nonexistent/dbc', $cache, $before))->name(12));
+            self::assertSame('Redridge Mountains', (new AreaNames('/nonexistent/dbc', $cache, $after))->name(44));
+            self::assertSame([], $cache->getValues(), 'a fixture is never cached');
+        } finally {
+            @unlink($before);
+            @unlink($after);
+        }
+    }
+
+    /**
+     * @param array<int, array{name: string}> $rows
+     */
+    private function fixture(array $rows): string
+    {
+        $path = (string) tempnam(sys_get_temp_dir(), 'anm-areas-');
+        file_put_contents($path, json_encode($rows, \JSON_THROW_ON_ERROR));
+
+        return $path;
     }
 }

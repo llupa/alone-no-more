@@ -179,16 +179,20 @@ final class AreaNames
             return $this->areas;
         }
 
-        $load = function (): array {
-            // Client data cannot be committed, so a clone without a WoW install falls back to
-            // the zones captured in the snapshot. Fewer zones, same shape, and callers already
-            // handle an unknown id — they say "an unnamed place" rather than inventing one.
-            $path = rtrim($this->dbcDir, '/').'/AreaTable.dbc';
+        $path = rtrim($this->dbcDir, '/').'/AreaTable.dbc';
 
-            if (!is_readable($path)) {
-                return $this->fromFixture();
-            }
+        // Client data cannot be committed, so a clone without a WoW install falls back to the
+        // zones captured in the snapshot. Fewer zones, same shape, and callers already handle an
+        // unknown id — they say "an unnamed place" rather than inventing one.
+        //
+        // Never cached. It is a handful of rows and it changes every time a session is
+        // recaptured; cached under the same key as the client data, an old recording's zones
+        // were served for a new one, and the replay called Redridge "zone 44".
+        if (!is_readable($path)) {
+            return $this->areas = $this->fromFixture();
+        }
 
+        $load = static function () use ($path): array {
             $dbc = new DbcFile($path);
             $areas = [];
 
@@ -212,9 +216,10 @@ final class AreaNames
         //
         // The key carries a version because the cache outlives a deploy: adding the faction
         // field to these rows left the old shape cached, and every lookup then failed on a
-        // missing key. Bump it whenever the row shape changes.
+        // missing key. Bump it whenever the row shape changes. It also names the file, so
+        // pointing ANM_DBC_DIR at another client is not answered from the last one.
         return $this->areas = null !== $this->cache
-            ? $this->cache->get('anm.dbc.areas.v2', static fn (): array => $load())
+            ? $this->cache->get('anm.dbc.areas.v3.'.md5($path), static fn (): array => $load())
             : $load();
     }
 }

@@ -89,12 +89,16 @@ final class ZoneBounds
             return $this->boxes;
         }
 
-        if (null === $this->cache) {
+        $path = rtrim($this->dbcDir, '/').'/WorldMapArea.dbc';
+
+        // Only real client data is cached. Caching its absence stored an empty map, and every
+        // run after that knew no zones at all, even once ANM_DBC_DIR had been set.
+        if (null === $this->cache || !is_readable($path)) {
             return $this->boxes = $this->read();
         }
 
         /** @var array<int, array{map: int, area: int, name: string, minX: float, maxX: float, minY: float, maxY: float}> $boxes */
-        $boxes = $this->cache->get('anm.dbc.worldmap.v1', fn (): array => $this->read());
+        $boxes = $this->cache->get('anm.dbc.worldmap.v2.'.md5($path), fn (): array => $this->read());
 
         return $this->boxes = $boxes;
     }

@@ -97,6 +97,16 @@ final readonly class WorldCompanions
             return \sprintf('"%s" is not a gender. Use male or female, or leave it out.', $gender);
         }
 
+        // The bots to choose from are in the server's database, which a recording does not
+        // have. Asked against the replay, this was the one tool that answered with a bare
+        // internal error; every other order there says plainly that nothing can be changed.
+        if (null !== $this->world->recordedAt()) {
+            return \sprintf(
+                'This is a recorded world, so nobody can be set aside for %s: the bots to choose from are on a live server. Point the app at a live AzerothCore to do this.',
+                $player->name,
+            );
+        }
+
         // Same faction, or they could never group — which is the entire point of the request.
         $found = $this->roster->dormantOfClass(
             $player,

@@ -20,7 +20,8 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * Position comes from SQL rather than the playerbots command server because the command server
  * only knows bots — the player's own character answers "invalid guid" — and because one query
  * returns the whole world where the TCP protocol needs a round trip per bot. The cost is a
- * `saveall` first, which is cheap and is what `refresh()` is for.
+ * `saveall` first, which is what `refresh()` is for. It is not cheap with a crowd online — every
+ * character is written — so the listener spaces it out; see {@see SaveSchedule}.
  */
 #[AsAlias(WorldGatewayInterface::class)]
 final readonly class AzerothCoreGateway implements WorldGatewayInterface
@@ -46,6 +47,11 @@ final readonly class AzerothCoreGateway implements WorldGatewayInterface
     public function refresh(): void
     {
         $this->soap->execute('saveall');
+    }
+
+    public function recordedAt(): ?\DateTimeImmutable
+    {
+        return null;
     }
 
     public function findActor(string $name): ?Actor

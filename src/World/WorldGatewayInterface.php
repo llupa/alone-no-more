@@ -25,6 +25,14 @@ interface WorldGatewayInterface
      */
     public function refresh(): void;
 
+    /**
+     * When this world was recorded, or null when it is live.
+     *
+     * Anything that shows the world to a person should say which it is: a recording that looks
+     * live reads as a server with everyone logged out.
+     */
+    public function recordedAt(): ?\DateTimeImmutable;
+
     public function findActor(string $name): ?Actor;
 
     public function findActorByGuid(int $guid): ?Actor;

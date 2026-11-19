@@ -32,6 +32,13 @@ final class ReplayGateway implements WorldGatewayInterface
         // Nothing to flush: the world is already as fresh as it will ever be.
     }
 
+    public function recordedAt(): ?\DateTimeImmutable
+    {
+        $at = $this->snapshot->capturedAt();
+
+        return null === $at ? null : new \DateTimeImmutable($at);
+    }
+
     public function findActor(string $name): ?Actor
     {
         foreach ($this->actors() as $actor) {

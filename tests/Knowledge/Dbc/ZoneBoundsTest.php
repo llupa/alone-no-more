@@ -8,6 +8,7 @@ use App\Knowledge\Dbc\AreaNames;
 use App\Knowledge\Dbc\ZoneBounds;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 /**
  * Reads the real WorldMapArea.dbc when one is available.
@@ -69,5 +70,17 @@ final class ZoneBoundsTest extends TestCase
     public function testAnUnknownMapHasNoZones(): void
     {
         self::assertNull($this->zones()->areaAt(9999, 0.0, 0.0));
+    }
+
+    /**
+     * Missing client data is a state to report, not one to remember. Caching it stored an empty
+     * map, and every run after that knew no zones at all, even once ANM_DBC_DIR had been set.
+     */
+    public function testMissingClientDataIsNotCached(): void
+    {
+        $cache = new ArrayAdapter();
+
+        self::assertNull((new ZoneBounds('/nonexistent/dbc', $cache))->areaAt(0, -9000.0, -100.0));
+        self::assertSame([], $cache->getValues());
     }
 }
